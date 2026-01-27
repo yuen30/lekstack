@@ -1,6 +1,6 @@
-# 🚀 Lekstack: The Native PHP Development Suite for Linux
+# 🚀 LekStack: The Native PHP Development Suite for Linux
 
-Lekstack คือเครื่องมือจำลองสภาพแวดล้อมการพัฒนา (Local Development Environment) ระดับ Lightweight ที่ออกแบบมาเพื่อชาว Linux โดยเฉพาะ โดยได้รับแรงบันดาลใจจากความง่ายของ Laravel Herd แต่รันแบบ Native บน Linux Distros
+LekStack คือเครื่องมือจำลองสภาพแวดล้อมการพัฒนา (Local Development Environment) ระดับ Lightweight ที่ออกแบบมาเพื่อชาว Linux โดยเฉพาะ โดยได้รับแรงบันดาลใจจากความง่ายของ Laravel Herd แต่รันแบบ Native บน Linux Distros
 
 > "Fast. Native. Zero-Config." — ลืมความยุ่งยากของ Docker และความหนักของ XAMPP ไปได้เลย
 
@@ -39,7 +39,7 @@ Lekstack คือเครื่องมือจำลองสภาพแ�
 
 ```bash
 # Example for Debian/Ubuntu
-sudo dpkg -i prow_0.1.0_amd64.deb
+sudo dpkg -i lekstack_0.1.0_amd64.deb
 ```
 
 
@@ -60,10 +60,11 @@ bun dev
 ## 🏗 Roadmap
 
 - [ ] **Phase 1**: Core Service Management (Nginx + PHP-FPM)
-- [ ] **Phase 2**: Automated DNS (.test domain support)
-- [ ] **Phase 3**: GUI for PHP Extensions Management
-- [ ] **Phase 4**: One-click DB Creation (MariaDB/PostgreSQL)
-- [ ] **Phase 5**: Site Isolation (Different PHP versions per site)
+- [ ] **Phase 2**: Version Management (Multi-PHP & Node.js Selector)
+- [ ] **Phase 3**: Automated DNS (.test domain support)
+- [ ] **Phase 4**: GUI for PHP Extensions Management
+- [ ] **Phase 5**: One-click DB Creation (MariaDB/PostgreSQL)
+- [ ] **Phase 6**: Site Isolation (Different PHP/Node versions per site)
 
 ## 🤝 Contributing
 

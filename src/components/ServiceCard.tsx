@@ -15,7 +15,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, version, status, descri
     const isLoading = status === 'loading';
 
     return (
-        <div className="group relative overflow-hidden bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 shadow-sm hover:shadow-md border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:-translate-y-1">
+        <div className="group relative overflow-hidden bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:-translate-y-1">
             {/* Background Glow Effect */}
             <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br transition-opacity duration-500 opacity-5 dark:opacity-10 rounded-bl-full -mr-8 -mt-8 ${isRunning ? 'from-green-500 to-emerald-500' : 'from-gray-500 to-gray-400'
                 }`} />
@@ -23,8 +23,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, version, status, descri
             <div className="flex justify-between items-start mb-6 relative">
                 <div className="flex gap-4">
                     <div className={`p-3.5 rounded-xl transition-colors duration-300 ${isRunning
-                            ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                        ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+                        : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
                         }`}>
                         {icon || <Activity size={24} />}
                     </div>
@@ -38,14 +38,14 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, version, status, descri
                             )}
                         </h3>
                         <div className={`flex items-center gap-1.5 mt-1 text-xs font-medium transition-colors ${status === 'running' ? 'text-green-600 dark:text-green-400' :
-                                status === 'loading' ? 'text-yellow-600 dark:text-yellow-400' :
-                                    status === 'error' ? 'text-red-500' :
-                                        'text-gray-400'
+                            status === 'loading' ? 'text-yellow-600 dark:text-yellow-400' :
+                                status === 'error' ? 'text-red-500' :
+                                    'text-gray-400'
                             }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${status === 'running' ? 'bg-green-500 animate-pulse' :
-                                    status === 'loading' ? 'bg-yellow-500 animate-bounce' :
-                                        status === 'error' ? 'bg-red-500' :
-                                            'bg-gray-300 dark:bg-gray-600'
+                                status === 'loading' ? 'bg-yellow-500 animate-bounce' :
+                                    status === 'error' ? 'bg-red-500' :
+                                        'bg-gray-300 dark:bg-gray-600'
                                 }`} />
                             <span className="uppercase tracking-wide">{status}</span>
                         </div>

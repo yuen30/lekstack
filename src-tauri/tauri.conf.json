@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "lekstack",
-        "width": 800,
-        "height": 600
+        "title": "LekStack",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false
       }
     ],
     "security": {

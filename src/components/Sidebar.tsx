@@ -1,16 +1,17 @@
 import React from 'react';
-import { LayoutGrid, Layers, Settings, Terminal } from 'lucide-react';
+import { LayoutDashboard, Download, Settings, Globe, FileText } from 'lucide-react';
 
 interface SidebarProps {
     activeView: string;
-    onNavigate: (view: 'dashboard' | 'versions' | 'logs' | 'settings') => void;
+    onNavigate: (view: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
     const menuItems = [
-        { id: 'dashboard', icon: LayoutGrid, label: 'Control Center' },
-        { id: 'versions', icon: Layers, label: 'Runtimes' },
-        { id: 'logs', icon: Terminal, label: 'Logs' },
+        { id: 'dashboard', icon: LayoutDashboard, label: 'Control Center' },
+        { id: 'sites', icon: Globe, label: 'Site Manager' },
+        { id: 'versions', icon: Download, label: 'Runtimes' },
+        { id: 'php-settings', icon: FileText, label: 'PHP Settings' },
         { id: 'settings', icon: Settings, label: 'Settings' },
     ];
 
@@ -26,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate }) => {
                 {menuItems.map((item) => (
                     <button
                         key={item.id}
-                        onClick={() => onNavigate(item.id as any)}
+                        onClick={() => onNavigate(item.id)}
                         className={`w-full flex justify-center py-3 relative group transition-colors ${activeView === item.id
                             ? 'text-indigo-600 dark:text-indigo-400'
                             : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'

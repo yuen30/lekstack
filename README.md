@@ -2,14 +2,17 @@
 
 LekStack คือเครื่องมือจำลองสภาพแวดล้อมการพัฒนา (Local Development Environment) ระดับ Lightweight ที่ออกแบบมาเพื่อชาว Linux โดยเฉพาะ โดยได้รับแรงบันดาลใจจากความง่ายของ Laravel Herd แต่รันแบบ Native บน Linux Distros
 
-> "Fast. Native. Zero-Config." — ลืมความยุ่งยากของ Docker และความหนักของ XAMPP ไปได้เลย
+> "Laravel Herd for Linux. Fast. Native. Zero-Config."
+>
+> LekStack นำประสบการณ์การพัฒนาที่ลื่นไหลแบบ Laravel Herd มาสู่ Linux โดยรันแบบ Native เพื่อประสิทธิภาพสูงสุด พร้อมฟีเจอร์ที่ช่วยให้คุณ Deploy โปรเจกต์ไปยัง Self-hosted Server ได้ง่ายที่สุด
 
 ## ✨ Key Features
 
 - **⚡ Lightning Fast**: พัฒนาด้วย Tauri + Rust ทำให้เปิดแอปได้ทันทีและกินทรัพยากรน้อยมาก (Tiny footprint)
 - **🔌 Zero Config**: ติดตั้งปุ๊บ พร้อมรันไฟล์ .php ผ่านโดเมน .test ได้ทันทีไม่ต้องตั้งค่าไฟล์ hosts เอง
-- **🔄 Multi-PHP Versions**: สลับเวอร์ชัน PHP (8.1, 8.2, 8.3, 8.4) ได้ในคลิกเดียวแยกตามรายโปรเจกต์
+- **🔄 Multi-Runtime**: รองรับทั้ง **PHP** (8.0-8.5), **Node.js** (NVM integration), และ **Bun**
 - **🛠 Integrated Stack**: มาพร้อม Nginx (Optimized for Linux), PHP-FPM และรองรับการจัดการ MariaDB/Redis
+- **🚀 Deploy to Self-hosted**: เชื่อมต่อช่องว่างระหว่าง Local และ Production ด้วยเครื่องมือช่วย Deploy ไปยัง VPS ของคุณเอง
 - **🐧 Systemd Integration**: จัดการ Lifecycle ของ Service ต่างๆ ผ่าน Systemd ของระบบโดยตรง นิ่งและเสถียร
 - **📦 No Docker Required**: รันทุกอย่างบน Bare Metal เพื่อประสิทธิภาพสูงสุดและเข้าถึง Unix Sockets ได้โดยตรง
 
@@ -60,11 +63,12 @@ bun dev
 ## 🏗 Roadmap
 
 - [ ] **Phase 1**: Core Service Management (Nginx + PHP-FPM)
-- [ ] **Phase 2**: Version Management (Multi-PHP & Node.js Selector)
+- [ ] **Phase 2**: Version Management (Multi-PHP & Node.js & Bun Selector)
 - [ ] **Phase 3**: Automated DNS (.test domain support)
 - [ ] **Phase 4**: GUI for PHP Extensions Management
 - [ ] **Phase 5**: One-click DB Creation (MariaDB/PostgreSQL)
 - [ ] **Phase 6**: Site Isolation (Different PHP/Node versions per site)
+- [ ] **Phase 7**: Self-hosted Deployment Tools (SSH & Provisioning)
 
 ## 🤝 Contributing
 

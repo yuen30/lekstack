@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Download, RefreshCw, Check, Trash2, Server, Search } from 'lucide-react';
-import nvmLogoColor from '../../assets/nvm-logo-color.svg';
-import nvmLogoWhite from '../../assets/nvm-logo-white.svg';
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { Download, RefreshCw, Check, Trash2, Search, Globe } from 'lucide-react';
+import { toast } from 'sonner';
 import bunLogo from '../../assets/bun-logo.svg';
+import phpLogo from '../../assets/php-logo.svg';
+import nodeLogo from '../../assets/node-logo.svg';
 
 interface Version {
     version: string;
@@ -12,60 +14,121 @@ interface Version {
 }
 
 const PHP_VERSIONS: Version[] = [
-    { version: '8.5', status: 'not_installed', releaseDate: 'Nov 2025', tags: ['Latest', 'Stable'] },
-    { version: '8.4', status: 'not_installed', releaseDate: 'Nov 2024', tags: ['Stable'] },
-    { version: '8.3', status: 'not_installed', releaseDate: 'Nov 2023', tags: ['Old Stable'] },
-    { version: '8.2', status: 'active', releaseDate: 'Dec 2022', tags: ['LTS', 'Default'] },
-    { version: '8.1', status: 'installed', releaseDate: 'Nov 2021', tags: ['LTS'] },
-    { version: '8.0', status: 'not_installed', releaseDate: 'Nov 2020', tags: ['EOL'] },
+    { version: '8.5', status: 'not_installed', releaseDate: 'Jan 2026', tags: ['Current Stable'] },
+    { version: '8.4', status: 'not_installed', releaseDate: 'Jan 2026', tags: ['Old Stable'] },
+    { version: '8.3', status: 'not_installed', releaseDate: 'Jan 2026', tags: ['Old Stable'] },
+    { version: '8.2', status: 'active', releaseDate: 'Dec 2025', tags: ['Old Stable', 'Default'] },
 ];
 
 const NODE_VERSIONS: Version[] = [
     { version: '25', status: 'not_installed', releaseDate: 'Oct 2025', tags: ['Current'] },
     { version: '24', status: 'active', releaseDate: 'May 2025', tags: ['Active LTS'] },
     { version: '22', status: 'installed', releaseDate: 'Apr 2024', tags: ['Maintenance LTS'] },
-    { version: '20', status: 'not_installed', releaseDate: 'Apr 2023', tags: ['Maintenance LTS'] },
 ];
 
 const BUN_VERSIONS: Version[] = [
     { version: '1.3.6', status: 'active', releaseDate: 'Jan 2026', tags: ['Latest', 'Stable'] },
     { version: '1.3.0', status: 'installed', releaseDate: 'Dec 2025', tags: ['Stable'] },
-    { version: 'Canary', status: 'not_installed', releaseDate: 'Daily', tags: ['Experimental'] },
 ];
 
-const NvmIcon = ({ size = 24, className }: { size?: number, className?: string }) => (
-    <picture>
-        <source media="(prefers-color-scheme: dark)" srcSet={nvmLogoWhite} />
-        <img src={nvmLogoColor} alt="NVM" style={{ width: size, height: size }} className={className} />
-    </picture>
-);
+const NGINX_VERSIONS: Version[] = [
+    { version: '1.24.0', status: 'not_installed', releaseDate: 'Apr 2023', tags: ['Stable', 'Static'] },
+];
 
 const BunIcon = ({ size = 24, className }: { size?: number, className?: string }) => (
     <img src={bunLogo} alt="Bun" style={{ width: size, height: size }} className={className} />
 );
 
+const PhpIcon = ({ size = 24, className }: { size?: number, className?: string }) => (
+    <img src={phpLogo} alt="PHP" style={{ width: size, height: size, objectFit: 'contain' }} className={className} />
+);
+
+const NodeIcon = ({ size = 24, className }: { size?: number, className?: string }) => (
+    <img src={nodeLogo} alt="Node.js" style={{ width: size, height: size }} className={className} />
+);
+
 export default function VersionManagerView() {
-    const [activeTab, setActiveTab] = useState<'php' | 'node' | 'bun'>('php');
+    const [activeTab, setActiveTab] = useState<'php' | 'node' | 'bun' | 'nginx'>('php');
     const [phpVersions, setPhpVersions] = useState(PHP_VERSIONS);
     const [nodeVersions, setNodeVersions] = useState(NODE_VERSIONS);
     const [bunVersions, setBunVersions] = useState(BUN_VERSIONS);
+    const [nginxVersions, setNginxVersions] = useState(NGINX_VERSIONS);
 
-    const installVersion = (version: string, type: 'php' | 'node' | 'bun') => {
-        const setter = type === 'php' ? setPhpVersions : type === 'node' ? setNodeVersions : setBunVersions;
+    // Fetch installed versions from backend
+    useEffect(() => {
+        const fetchInstalled = async () => {
+            try {
+                const installed = await invoke<string[]>('list_installed_versions', { runtime: activeTab });
+                console.log(`Installed ${activeTab} versions:`, installed);
+
+                const updateStatus = (catalog: Version[]) => {
+                    return catalog.map(v => ({
+                        ...v,
+                        status: installed.includes(v.version) ? 'installed' as const : 'not_installed' as const
+                    }));
+                };
+
+                if (activeTab === 'php') setPhpVersions(updateStatus(PHP_VERSIONS));
+                if (activeTab === 'node') setNodeVersions(updateStatus(NODE_VERSIONS));
+                if (activeTab === 'bun') setBunVersions(updateStatus(BUN_VERSIONS));
+                if (activeTab === 'nginx') setNginxVersions(updateStatus(NGINX_VERSIONS));
+
+            } catch (error) {
+                console.error('Failed to list versions:', error);
+            }
+        };
+
+        fetchInstalled();
+    }, [activeTab]);
+
+    const installVersion = async (version: string, type: 'php' | 'node' | 'bun' | 'nginx') => {
+        const setter = type === 'php' ? setPhpVersions : type === 'node' ? setNodeVersions : type === 'bun' ? setBunVersions : setNginxVersions;
 
         setter(prev => prev.map(v =>
             v.version === version ? { ...v, status: 'installing' } : v
         ));
 
-        setTimeout(() => {
+        try {
+            await invoke('install_runtime', { runtime: type, version });
+
+            // Re-fetch installed list to confirm
+            const installed = await invoke<string[]>('list_installed_versions', { runtime: type });
+
             setter(prev => prev.map(v =>
-                v.version === version ? { ...v, status: 'installed' } : v
+                v.version === version ? {
+                    ...v,
+                    status: installed.includes(version) ? 'installed' : 'not_installed'
+                } : v
             ));
-        }, 1500);
+
+            if (installed.includes(version)) {
+                toast.success(`${type.toUpperCase()} ${version} installed successfully!`);
+            }
+        } catch (error) {
+            console.error('Installation failed:', error);
+            toast.error(`Installation failed: ${error}`, {
+                duration: 5000,
+                description: 'Please check your internet connection and try again.'
+            });
+
+            setter(prev => prev.map(v =>
+                v.version === version ? { ...v, status: 'not_installed' } : v
+            ));
+        }
     };
 
-    const currentList = activeTab === 'php' ? phpVersions : activeTab === 'node' ? nodeVersions : bunVersions;
-    const ActiveIcon = activeTab === 'php' ? Server : activeTab === 'node' ? NvmIcon : BunIcon;
+    const setGlobalVersion = async (version: string, type: 'php' | 'node' | 'bun' | 'nginx') => {
+        try {
+            await invoke('update_global_shims', { runtime: type, version });
+            toast.success(`Global ${type.toUpperCase()} version set to ${version}`);
+        } catch (error) {
+            console.error('Failed to set global version:', error);
+            toast.error(`Failed to set global version: ${error}`);
+        }
+    };
+
+    const currentList = activeTab === 'php' ? phpVersions : activeTab === 'node' ? nodeVersions : activeTab === 'bun' ? bunVersions : nginxVersions;
+    const ActiveIcon = activeTab === 'php' ? PhpIcon : activeTab === 'node' ? NodeIcon : activeTab === 'bun' ? BunIcon : () => <span className="font-bold font-mono text-emerald-500">N</span>;
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -90,7 +153,7 @@ export default function VersionManagerView() {
                             : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                     >
-                        <Server size={18} /> PHP
+                        <PhpIcon size={18} /> PHP
                     </button>
                     <button
                         onClick={() => setActiveTab('node')}
@@ -99,7 +162,7 @@ export default function VersionManagerView() {
                             : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                     >
-                        <NvmIcon size={18} /> Node.js
+                        <NodeIcon size={18} /> Node.js
                     </button>
                     <button
                         onClick={() => setActiveTab('bun')}
@@ -109,6 +172,15 @@ export default function VersionManagerView() {
                             }`}
                     >
                         <BunIcon size={18} /> Bun
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('nginx')}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'nginx'
+                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                    >
+                        <span className="font-bold font-mono">N</span> Nginx
                     </button>
                 </div>
 
@@ -180,6 +252,15 @@ export default function VersionManagerView() {
                                         </button>
                                     ) : (
                                         <div className="flex items-center justify-end gap-2">
+                                            {activeTab !== 'nginx' && (
+                                                <button
+                                                    onClick={() => setGlobalVersion(ver.version, activeTab)}
+                                                    className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Set as Global Default"
+                                                >
+                                                    <Globe size={16} />
+                                                </button>
+                                            )}
                                             {ver.status !== 'active' && (
                                                 <button className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Uninstall">
                                                     <Trash2 size={16} />

@@ -64,7 +64,7 @@ export default function PhpSettingsView() {
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 h-full flex flex-col">
+    <div className="p-8 max-w-full mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 h-full flex flex-col">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">

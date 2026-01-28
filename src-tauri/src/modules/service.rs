@@ -1,7 +1,7 @@
 use super::common::{get_default_path, get_service_port_value};
 use super::database::{init_mariadb_data, init_postgresql_data};
 use std::fs;
-use std::io::Write;
+// use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -478,8 +478,7 @@ pub fn update_service_port(name: String, port: u16) -> Result<String, String> {
     Ok("Port updated".to_string())
 }
 
-#[tauri::command]
-pub fn restart_all_services() -> Result<String, String> {
+pub fn restart_all_services_logic() -> Result<String, String> {
     // Stop list
     let services = vec!["nginx", "php-8.2", "mariadb", "postgresql", "redis"];
     for s in &services {
@@ -490,4 +489,9 @@ pub fn restart_all_services() -> Result<String, String> {
         start_service(s.to_string());
     }
     Ok("Restarted".to_string())
+}
+
+#[tauri::command]
+pub fn restart_all_services() -> Result<String, String> {
+    restart_all_services_logic()
 }

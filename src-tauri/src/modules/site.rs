@@ -56,11 +56,11 @@ pub fn internal_scan_sites() -> Vec<Site> {
                             // Default PHP version
                             let mut php_version = "8.2".to_string();
 
-                            // Check .lekstack/config.json in project? (ProjectConfig)
-                            // or .lekstack.json
-                            let proj_conf = p.join(".lekstack.json"); // Or settings
-                                                                      // Actually 'load_config' above is for Global.
-                                                                      // We need to parse project config here.
+                            // Check .lekstack.json
+                            let _proj_conf = p.join(".lekstack.json");
+
+                            // Actually 'load_config' above is for Global.
+                            // We need to parse project config here.
 
                             // Try reading .lekstack/settings.json in project
                             let local_conf = p.join(".lekstack/settings.json");
@@ -377,10 +377,7 @@ pub fn unsecure_site(name: String) -> Result<String, String> {
     Ok("Site unsecured".to_string())
 }
 
-#[tauri::command]
-pub fn init_project(path: String) -> Result<String, String> {
-    // Logic from init_project_logic/init_project
-    // Simply creates .lekstack dir?
+pub fn init_project_logic(path: String) -> Result<String, String> {
     let target = PathBuf::from(&path);
     if !target.exists() {
         return Err("Path not found".to_string());
@@ -390,4 +387,9 @@ pub fn init_project(path: String) -> Result<String, String> {
         fs::create_dir_all(&conf).map_err(|e| e.to_string())?;
     }
     Ok("Project initialized".to_string())
+}
+
+#[tauri::command]
+pub fn init_project(path: String) -> Result<String, String> {
+    init_project_logic(path)
 }

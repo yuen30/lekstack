@@ -95,7 +95,7 @@ pub async fn install_runtime(
             ("https://archive.mariadb.org/mariadb-11.4.4/bintar-linux-systemd-x86_64/mariadb-11.4.4-linux-systemd-x86_64.tar.gz".to_string(), "mariadb.tar.gz")
         ],
         "postgresql" => vec![
-            ("https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/16.2.0/embedded-postgres-binaries-linux-amd64-16.2.0.jar".to_string(), "postgres.jar")
+            ("https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/17.3.0/embedded-postgres-binaries-linux-amd64-17.3.0.jar".to_string(), "postgres.jar")
         ],
         "redis" => vec![
             ("https://repo1.maven.org/maven2/com/github/lansheng228/embedded-redis/7.4.1/embedded-redis-7.4.1.jar".to_string(), "redis.jar")

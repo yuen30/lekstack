@@ -114,9 +114,9 @@ export default function VersionManagerView() {
         prev.map((v) =>
           v.version === version
             ? {
-                ...v,
-                status: installed.includes(version) ? 'installed' : 'not_installed',
-              }
+              ...v,
+              status: installed.includes(version) ? 'installed' : 'not_installed',
+            }
             : v
         )
       );
@@ -157,7 +157,7 @@ export default function VersionManagerView() {
           : nginxVersions;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="p-8 max-w-full mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
@@ -181,41 +181,37 @@ export default function VersionManagerView() {
         <div className="flex gap-1">
           <button
             onClick={() => setActiveTab('php')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-              activeTab === 'php'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'php'
                 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
+              }`}
           >
             <PhpIcon size={18} /> PHP
           </button>
           <button
             onClick={() => setActiveTab('node')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-              activeTab === 'node'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'node'
                 ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
+              }`}
           >
             <NodeIcon size={18} /> Node.js
           </button>
           <button
             onClick={() => setActiveTab('bun')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-              activeTab === 'bun'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'bun'
                 ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
+              }`}
           >
             <BunIcon size={18} /> Bun
           </button>
           <button
             onClick={() => setActiveTab('nginx')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
-              activeTab === 'nginx'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'nginx'
                 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
+              }`}
           >
             <span className="font-bold font-mono">N</span> Nginx
           </button>
@@ -250,11 +246,10 @@ export default function VersionManagerView() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                        ver.status === 'active'
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${ver.status === 'active'
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                           : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                      }`}
+                        }`}
                     >
                       {ver.status === 'active' ? (
                         <Check size={14} strokeWidth={3} />
@@ -280,13 +275,12 @@ export default function VersionManagerView() {
                     {ver.tags?.map((tag) => (
                       <span
                         key={tag}
-                        className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
-                          tag.includes('LTS')
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border ${tag.includes('LTS')
                             ? 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800'
                             : tag.includes('Beta')
                               ? 'bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
                               : 'bg-gray-50 text-gray-600 border-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
-                        }`}
+                          }`}
                       >
                         {tag}
                       </span>

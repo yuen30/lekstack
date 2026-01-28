@@ -72,7 +72,7 @@ export default function SiteManagerView() {
   const phpVersions = ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5'];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="p-8 max-w-full mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">

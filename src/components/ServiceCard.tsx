@@ -1,12 +1,12 @@
-import React from 'react';
-import { Power, Activity } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Play, Square, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface ServiceCardProps {
   name: string;
   version?: string;
   status: 'running' | 'stopped' | 'error' | 'loading';
-  description?: string;
-  icon?: React.ReactNode;
+  description: string;
+  icon: React.ReactNode;
   onToggle: () => void;
 }
 
@@ -15,88 +15,120 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   version,
   status,
   description,
-  onToggle,
   icon,
+  onToggle,
 }) => {
   const isRunning = status === 'running';
+  const isError = status === 'error';
   const isLoading = status === 'loading';
 
   return (
-    <div className="group relative overflow-hidden bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:-translate-y-1">
-      {/* Background Glow Effect */}
-      <div
-        className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br transition-opacity duration-500 opacity-5 dark:opacity-10 rounded-bl-full -mr-8 -mt-8 ${
-          isRunning ? 'from-green-500 to-emerald-500' : 'from-gray-500 to-gray-400'
-        }`}
-      />
-
-      <div className="flex justify-between items-start mb-6 relative">
-        <div className="flex gap-4">
+    <motion.div
+      whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' }}
+      className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-100 dark:border-gray-800 p-6 flex flex-col h-full transition-shadow group"
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-4">
           <div
-            className={`p-3.5 rounded-xl transition-colors duration-300 ${
-              isRunning
-                ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-                : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-            }`}
+            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isRunning
+              ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+              : 'bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+              }`}
           >
-            {icon || <Activity size={24} />}
+            {icon}
           </div>
           <div>
-            <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-500 transition-colors">
               {name}
-              {version && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 dark:group-hover:bg-blue-900/30 dark:group-hover:text-blue-300">
-                  v{version}
-                </span>
-              )}
-            </h3>
-            <div
-              className={`flex items-center gap-1.5 mt-1 text-xs font-medium transition-colors ${
-                status === 'running'
-                  ? 'text-green-600 dark:text-green-400'
-                  : status === 'loading'
-                    ? 'text-yellow-600 dark:text-yellow-400'
-                    : status === 'error'
-                      ? 'text-red-500'
-                      : 'text-gray-400'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  status === 'running'
-                    ? 'bg-green-500 animate-pulse'
-                    : status === 'loading'
-                      ? 'bg-yellow-500 animate-bounce'
-                      : status === 'error'
-                        ? 'bg-red-500'
-                        : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              />
-              <span className="uppercase tracking-wide">{status}</span>
-            </div>
+            </h4>
+            {version ? (
+              <span className="text-xs font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                v{version}
+              </span>
+            ) : (
+              <span className="text-[10px] text-amber-500 font-medium">Not Installed</span>
+            )}
           </div>
         </div>
 
-        <button
-          onClick={onToggle}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
           disabled={isLoading}
-          className={`
-            relative p-3 rounded-xl transition-all duration-200 active:scale-95
-            ${
-              isRunning
-                ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30'
-                : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30'
-            }
-            ${isLoading ? 'opacity-50 cursor-wait' : ''}
-          `}
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isRunning
+            ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30'
+            : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30'
+            } ${isLoading ? 'opacity-50 cursor-wait' : ''}`}
           title={isRunning ? 'Stop Service' : 'Start Service'}
         >
-          <Power size={20} className={isLoading ? 'animate-spin' : ''} />
-        </button>
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, rotate: -180 }}
+                animate={{ opacity: 1, rotate: 0 }}
+                exit={{ opacity: 0, rotate: 180 }}
+              >
+                <Loader2 className="animate-spin" size={20} />
+              </motion.div>
+            ) : isRunning ? (
+              <motion.div
+                key="stop"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+              >
+                <Square size={18} fill="currentColor" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="start"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+              >
+                <Play size={18} fill="currentColor" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.button>
       </div>
 
-      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{description}</p>
-    </div>
+      <p className="text-sm text-gray-500 dark:text-gray-400 flex-1 leading-relaxed">
+        {description}
+      </p>
+
+      <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-800 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {isRunning ? (
+            <>
+              <CheckCircle2 size={14} className="text-green-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-green-500">
+                Running
+              </span>
+            </>
+          ) : isError ? (
+            <>
+              <AlertCircle size={14} className="text-red-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-500">
+                Error
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-gray-700" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                Stopped
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 };
 

@@ -32,7 +32,7 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="p-8 max-w-full mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -72,13 +72,12 @@ export default function SettingsView() {
             <button
               onClick={handleSave}
               disabled={status === 'saving'}
-              className={`px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 ${
-                status === 'success'
+              className={`px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 ${status === 'success'
                   ? 'bg-green-600 hover:bg-green-700 text-white'
                   : status === 'error'
                     ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              }`}
+                }`}
             >
               {status === 'saving' ? (
                 <span className="animate-spin">⏳</span>
@@ -95,13 +94,12 @@ export default function SettingsView() {
 
           {message && (
             <div
-              className={`text-sm flex items-center gap-2 px-3 py-2 rounded-lg ${
-                status === 'success'
+              className={`text-sm flex items-center gap-2 px-3 py-2 rounded-lg ${status === 'success'
                   ? 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20'
                   : status === 'error'
                     ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20'
                     : 'text-gray-500 bg-gray-50 dark:text-gray-400 dark:bg-gray-800'
-              }`}
+                }`}
             >
               {message}
             </div>

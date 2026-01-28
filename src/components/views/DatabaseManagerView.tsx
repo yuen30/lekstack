@@ -16,16 +16,18 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+type ServiceStatus = 'running' | 'stopped' | 'not_installed' | 'loading';
+
+interface DownloadPayload {
+  percent: number;
+  current: number;
+  total: number;
+}
+
 export default function DatabaseManagerView() {
-  const [status, setStatus] = useState<'running' | 'stopped' | 'not_installed' | 'loading'>(
-    'loading'
-  );
-  const [pgStatus, setPgStatus] = useState<'running' | 'stopped' | 'not_installed' | 'loading'>(
-    'loading'
-  );
-  const [redisStatus, setRedisStatus] = useState<
-    'running' | 'stopped' | 'not_installed' | 'loading'
-  >('loading');
+  const [status, setStatus] = useState<ServiceStatus>('loading');
+  const [pgStatus, setPgStatus] = useState<ServiceStatus>('loading');
+  const [redisStatus, setRedisStatus] = useState<ServiceStatus>('loading');
 
   // Track which service is installing/loading
   const [installing, setInstalling] = useState<string | null>(null);
@@ -61,7 +63,7 @@ export default function DatabaseManagerView() {
         setStatus('not_installed');
       } else {
         const s = await invoke<string>('get_service_status', { name: 'mariadb' });
-        setStatus(s as any);
+        setStatus(s as ServiceStatus);
       }
 
       // PostgreSQL Status
@@ -72,7 +74,7 @@ export default function DatabaseManagerView() {
         setPgStatus('not_installed');
       } else {
         const s = await invoke<string>('get_service_status', { name: 'postgresql' });
-        setPgStatus(s as any);
+        setPgStatus(s as ServiceStatus);
       }
 
       // Redis Status
@@ -83,7 +85,7 @@ export default function DatabaseManagerView() {
         setRedisStatus('not_installed');
       } else {
         const s = await invoke<string>('get_service_status', { name: 'redis' });
-        setRedisStatus(s as any);
+        setRedisStatus(s as ServiceStatus);
       }
 
       // Load current ports
@@ -103,7 +105,7 @@ export default function DatabaseManagerView() {
     const interval = setInterval(checkStatus, 5000);
 
     // Listen for download progress
-    const unlisten = listen('download_progress', (event: any) => {
+    const unlisten = listen<DownloadPayload>('download_progress', (event) => {
       const { percent } = event.payload;
       setDownloadProgress(percent);
     });
@@ -134,6 +136,9 @@ export default function DatabaseManagerView() {
 
   const toggleService = async (name: string, currentStatus: string) => {
     setActionLoading(name);
+    const isStarting = currentStatus !== 'running';
+    const toastId = toast.loading(`${isStarting ? 'Starting' : 'Stopping'} ${name}...`);
+
     try {
       const command = currentStatus === 'running' ? 'stop_service' : 'start_service';
       await invoke(command, { name });
@@ -150,20 +155,25 @@ export default function DatabaseManagerView() {
         const s = await invoke<string>('get_service_status', { name });
 
         // Update specific state to reflect reality immediately
-        if (name === 'mariadb') setStatus(s as any);
-        if (name === 'postgresql') setPgStatus(s as any);
-        if (name === 'redis') setRedisStatus(s as any);
+        if (name === 'mariadb') setStatus(s as ServiceStatus);
+        if (name === 'postgresql') setPgStatus(s as ServiceStatus);
+        if (name === 'redis') setRedisStatus(s as ServiceStatus);
 
         // If status matches target (or at least changed from original), stop.
         if (s === targetStatus || s !== currentStatus || attempts >= maxAttempts) {
           clearInterval(poll);
           setActionLoading(null);
+          if (s === targetStatus) {
+            toast.success(`${name} ${isStarting ? 'Started' : 'Stopped'}`, { id: toastId });
+          } else {
+            toast.error(`${name} timed out`, { id: toastId });
+          }
           // Final sync
           checkStatus();
         }
       }, 250);
     } catch (error) {
-      toast.error(`Operation failed: ${error}`);
+      toast.error(`Operation failed: ${error}`, { id: toastId });
       setActionLoading(null);
     }
   };
@@ -188,8 +198,8 @@ export default function DatabaseManagerView() {
     {
       id: 'postgresql',
       name: 'PostgreSQL',
-      version: '16.2',
-      fullVersion: '16.2.0',
+      version: '17.3',
+      fullVersion: '17.3.0',
       desc: 'Advanced open source relational database.',
       status: pgStatus,
       port: postgresPort,
@@ -557,11 +567,10 @@ export default function DatabaseManagerView() {
                     onClick={() => toggleService(svc.id, svc.status as string)}
                     disabled={actionLoading === svc.id}
                     className={`col-span-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all font-medium border active:scale-95
-                            ${
-                              svc.status === 'running'
-                                ? 'bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:bg-transparent dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20'
-                                : 'col-span-2 bg-green-600 border-transparent text-white hover:bg-green-700 shadow-lg shadow-green-600/20 dark:bg-green-600'
-                            }`}
+                            ${svc.status === 'running'
+                        ? 'bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:bg-transparent dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20'
+                        : 'col-span-2 bg-green-600 border-transparent text-white hover:bg-green-700 shadow-lg shadow-green-600/20 dark:bg-green-600'
+                      }`}
                   >
                     {actionLoading === svc.id ? (
                       <Loader2 className="animate-spin" size={18} />

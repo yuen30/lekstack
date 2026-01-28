@@ -6,6 +6,7 @@ import VersionManagerView from './components/views/VersionManagerView';
 import SiteManagerView from './components/views/SiteManagerView';
 import SettingsView from './components/views/SettingsView';
 import PhpSettingsView from './components/views/PhpSettingsView';
+import DatabaseManagerView from './components/views/DatabaseManagerView';
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -19,6 +20,7 @@ function App() {
         {activeView === 'dashboard' && <DashboardView />}
         {activeView === 'versions' && <VersionManagerView />}
         {activeView === 'sites' && <SiteManagerView />}
+        {activeView === 'database' && <DatabaseManagerView />}
         {activeView === 'php-settings' && <PhpSettingsView />}
         {activeView === 'settings' && <SettingsView />}
       </main>

@@ -1,6 +1,8 @@
-use tauri::Manager;
+use log::info;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::Manager;
+use time::macros::format_description;
 
 pub mod modules;
 
@@ -12,6 +14,28 @@ pub use modules::site::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize logging
+    let log_dir = get_default_path().join("logs");
+    std::fs::create_dir_all(&log_dir).ok();
+
+    let log_file = log_dir.join("lekstack.log");
+
+    let config = simplelog::ConfigBuilder::new()
+        .set_time_format_custom(format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second]"
+        ))
+        .build();
+
+    let _ = simplelog::WriteLogger::init(
+        simplelog::LevelFilter::Info,
+        config,
+        std::fs::File::create(log_file).unwrap(),
+    );
+
+    info!("Starting LekStack v{}", env!("CARGO_PKG_VERSION"));
+    info!("OS: {}", std::env::consts::OS);
+    info!("Arch: {}", std::env::consts::ARCH);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -56,10 +80,12 @@ pub fn run() {
             get_install_path,
             init_environment,
             get_service_status,
+            get_all_services,
             start_service,
             stop_service,
             list_installed_versions,
             get_active_version,
+            get_active_versions,
             install_runtime,
             uninstall_runtime,
             get_parked_paths,
@@ -85,6 +111,9 @@ pub fn run() {
             update_service_port,
             get_service_logs
         ])
+        .on_page_load(|window, _payload| {
+            log::info!("Page loaded: {}", window.label());
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

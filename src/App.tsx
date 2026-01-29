@@ -32,9 +32,9 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#111] font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300">
-      <Sidebar 
-        activeView={activeView} 
-        onNavigate={setActiveView} 
+      <Sidebar
+        activeView={activeView}
+        onNavigate={setActiveView}
         isDark={isDark}
         onToggleTheme={() => setIsDark(!isDark)}
       />

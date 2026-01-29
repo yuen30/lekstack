@@ -26,21 +26,21 @@ export default function NodeConfigEditor({ version, isOpen, onClose }: NodeConfi
       // Load package.json content
       const projectPath = await invoke<string>('get_install_path');
       const configPath = `${projectPath}/versions/node/${version}/lib/node_modules/npm/package.json`;
-      
+
       // For now, we'll create a sample config
       const sampleConfig = {
         name: `node-${version}-project`,
-        version: "1.0.0",
-        description: "Node.js project managed by LekStack",
-        main: "index.js",
+        version: '1.0.0',
+        description: 'Node.js project managed by LekStack',
+        main: 'index.js',
         scripts: {
-          start: "node index.js",
-          dev: "nodemon index.js"
+          start: 'node index.js',
+          dev: 'nodemon index.js',
         },
         dependencies: {},
-        devDependencies: {}
+        devDependencies: {},
       };
-      
+
       setPackageJson(JSON.stringify(sampleConfig, null, 2));
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -56,7 +56,7 @@ export default function NodeConfigEditor({ version, isOpen, onClose }: NodeConfi
     try {
       // Validate JSON
       JSON.parse(packageJson);
-      
+
       // In real implementation, this would save to the actual package.json file
       toast.success(`Node.js configuration updated for v${version}`);
       onClose();

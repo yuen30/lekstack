@@ -1,5 +1,6 @@
 use super::common::{
-    ensure_mkcert, get_default_path, is_secured, load_config, save_config, ProjectConfig, Site,
+    ensure_mkcert, get_default_path, is_secured, load_config, save_config, LekStackError,
+    ProjectConfig, Result, Site,
 };
 use std::fs;
 use std::os::unix::fs::symlink;
@@ -7,39 +8,39 @@ use std::path::PathBuf;
 use std::process::Command;
 
 #[tauri::command]
-pub fn get_parked_paths() -> Vec<String> {
-    let config = load_config();
-    config.parked_paths
+pub fn get_parked_paths() -> Result<Vec<String>> {
+    let config = load_config()?;
+    Ok(config.parked_paths)
 }
 
-pub fn add_parked_path_logic(path: String) -> Vec<String> {
-    let mut config = load_config();
+pub fn add_parked_path_logic(path: String) -> Result<Vec<String>> {
+    let mut config = load_config()?;
     if !config.parked_paths.contains(&path) {
         config.parked_paths.push(path);
-        save_config(&config);
+        save_config(&config)?;
     }
-    config.parked_paths
+    Ok(config.parked_paths)
 }
 
 #[tauri::command]
-pub fn add_parked_path(path: String) -> Vec<String> {
+pub fn add_parked_path(path: String) -> Result<Vec<String>> {
     add_parked_path_logic(path)
 }
 
-pub fn remove_parked_path_logic(path: String) -> Vec<String> {
-    let mut config = load_config();
+pub fn remove_parked_path_logic(path: String) -> Result<Vec<String>> {
+    let mut config = load_config()?;
     config.parked_paths.retain(|p| p != &path);
-    save_config(&config);
-    config.parked_paths
+    save_config(&config)?;
+    Ok(config.parked_paths)
 }
 
 #[tauri::command]
-pub fn remove_parked_path(path: String) -> Vec<String> {
+pub fn remove_parked_path(path: String) -> Result<Vec<String>> {
     remove_parked_path_logic(path)
 }
 
-pub fn internal_scan_sites() -> Vec<Site> {
-    let config = load_config();
+pub fn internal_scan_sites() -> Result<Vec<Site>> {
+    let config = load_config()?;
     let mut sites = Vec::new();
 
     // 1. Scan Parked Paths
@@ -135,19 +136,19 @@ pub fn internal_scan_sites() -> Vec<Site> {
         }
     }
 
-    sites
+    Ok(sites)
 }
 
 #[tauri::command]
-pub fn scan_sites() -> Vec<Site> {
-    internal_scan_sites()
+pub fn scan_sites() -> Result<Vec<Site>> {
+    Ok(internal_scan_sites()?)
 }
 
-pub fn link_site_logic(path: String, name: String) -> Result<String, String> {
+pub fn link_site_logic(path: String, name: String) -> Result<String> {
     let base_path = get_default_path();
     let valet_dir = base_path.join("valet");
     if !valet_dir.exists() {
-        fs::create_dir_all(&valet_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&valet_dir).map_err(|e| LekStackError::IoError(e))?;
     }
 
     let link_path = valet_dir.join(&name);
@@ -157,47 +158,47 @@ pub fn link_site_logic(path: String, name: String) -> Result<String, String> {
         fs::remove_file(&link_path).ok(); // Remove old link
     }
 
-    symlink(&target_path, &link_path).map_err(|e| e.to_string())?;
+    symlink(&target_path, &link_path).map_err(|e| LekStackError::IoError(e))?;
 
     Ok(format!("Linked {} to {}", name, path))
 }
 
 #[tauri::command]
-pub fn link_site(path: String, name: String) -> Result<String, String> {
+pub fn link_site(path: String, name: String) -> Result<String> {
     let res = link_site_logic(path, name)?;
     let _ = refresh_routes();
     Ok(res)
 }
 
-pub fn unlink_site_logic(name: String) -> Result<String, String> {
+pub fn unlink_site_logic(name: String) -> Result<String> {
     let base_path = get_default_path();
     let valet_dir = base_path.join("valet");
     let link_path = valet_dir.join(&name);
 
     if link_path.exists() {
-        fs::remove_file(&link_path).map_err(|e| e.to_string())?;
+        fs::remove_file(&link_path).map_err(|e| LekStackError::IoError(e))?;
         Ok(format!("Unlinked {}", name))
     } else {
-        Err("Link not found".to_string())
+        Err(LekStackError::RuntimeError("Link not found".to_string()))
     }
 }
 
 #[tauri::command]
-pub fn unlink_site(name: String) -> Result<String, String> {
+pub fn unlink_site(name: String) -> Result<String> {
     let res = unlink_site_logic(name)?;
     let _ = refresh_routes();
     Ok(res)
 }
 
 #[tauri::command]
-pub fn refresh_routes() -> Result<String, String> {
-    let sites = internal_scan_sites();
+pub fn refresh_routes() -> Result<String> {
+    let sites = internal_scan_sites()?;
     let base_path = get_default_path();
     let config_dir = base_path.join("config");
     let sites_dir = config_dir.join("sites");
 
     if !sites_dir.exists() {
-        fs::create_dir_all(&sites_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&sites_dir).map_err(|e| LekStackError::IoError(e))?;
     }
 
     // Clean up old config files
@@ -280,7 +281,7 @@ pub fn refresh_routes() -> Result<String, String> {
         );
 
         let site_conf_path = sites_dir.join(format!("{}.test.conf", site.name));
-        fs::write(&site_conf_path, block).map_err(|e| e.to_string())?;
+        fs::write(&site_conf_path, block).map_err(|e| LekStackError::IoError(e))?;
     }
 
     // Reload Nginx
@@ -296,15 +297,17 @@ pub fn refresh_routes() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn isolate_site(path: String, version: String) -> Result<String, String> {
+pub fn isolate_site(path: String, version: String) -> Result<String> {
     let target = PathBuf::from(&path);
     if !target.exists() {
-        return Err("Path does not exist".to_string());
+        return Err(LekStackError::RuntimeError(
+            "Path does not exist".to_string(),
+        ));
     }
 
     let settings_dir = target.join(".lekstack");
     if !settings_dir.exists() {
-        fs::create_dir_all(&settings_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&settings_dir).map_err(|e| LekStackError::IoError(e))?;
     }
 
     let settings_file = settings_dir.join("settings.json");
@@ -316,18 +319,18 @@ pub fn isolate_site(path: String, version: String) -> Result<String, String> {
         &settings_file,
         serde_json::to_string_pretty(&content).unwrap(),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| LekStackError::IoError(e))?;
 
     let _ = refresh_routes();
     Ok(format!("Isolated site at {} to PHP {}", path, version))
 }
 
 #[tauri::command]
-pub async fn secure_site(name: String) -> Result<String, String> {
+pub async fn secure_site(name: String) -> Result<String> {
     let base_path = get_default_path();
     let certs_dir = base_path.join("config/certs");
     if !certs_dir.exists() {
-        fs::create_dir_all(&certs_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&certs_dir).map_err(|e| LekStackError::IoError(e))?;
     }
 
     // Ensure mkcert installed
@@ -349,10 +352,12 @@ pub async fn secure_site(name: String) -> Result<String, String> {
         // If we want portable, we might play with CAROOT.
         // For now, let it use default.
         .status()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| LekStackError::RuntimeError(e.to_string()))?;
 
     if !status.success() {
-        return Err("Failed to generate cert".to_string());
+        return Err(LekStackError::RuntimeError(
+            "Failed to generate cert".to_string(),
+        ));
     }
 
     refresh_routes()?; // Sync nginx
@@ -360,7 +365,7 @@ pub async fn secure_site(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn unsecure_site(name: String) -> Result<String, String> {
+pub fn unsecure_site(name: String) -> Result<String> {
     let base_path = get_default_path();
     let certs_dir = base_path.join("config/certs");
     let cert_file = certs_dir.join(format!("{}.pem", name));
@@ -377,19 +382,19 @@ pub fn unsecure_site(name: String) -> Result<String, String> {
     Ok("Site unsecured".to_string())
 }
 
-pub fn init_project_logic(path: String) -> Result<String, String> {
+pub fn init_project_logic(path: String) -> Result<String> {
     let target = PathBuf::from(&path);
     if !target.exists() {
-        return Err("Path not found".to_string());
+        return Err(LekStackError::RuntimeError("Path not found".to_string()));
     }
     let conf = target.join(".lekstack");
     if !conf.exists() {
-        fs::create_dir_all(&conf).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&conf).map_err(|e| LekStackError::IoError(e))?;
     }
     Ok("Project initialized".to_string())
 }
 
 #[tauri::command]
-pub fn init_project(path: String) -> Result<String, String> {
+pub fn init_project(path: String) -> Result<String> {
     init_project_logic(path)
 }

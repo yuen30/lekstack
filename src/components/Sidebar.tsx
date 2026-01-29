@@ -1,6 +1,15 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { LayoutDashboard, Download, Settings, Globe, FileText, Database, Moon, Sun } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Download,
+  Settings,
+  Globe,
+  FileText,
+  Database,
+  Moon,
+  Sun,
+} from 'lucide-react';
 
 interface SidebarProps {
   activeView: string;
@@ -41,9 +50,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, isDark, onTog
           >
             {/* Active Indicator Line */}
             {activeView === item.id && (
-              <motion.div 
+              <motion.div
                 layoutId="active-nav"
-                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-600 dark:bg-indigo-400 rounded-r-full" 
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-600 dark:bg-indigo-400 rounded-r-full"
               />
             )}
 

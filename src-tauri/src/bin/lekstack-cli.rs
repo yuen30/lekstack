@@ -71,7 +71,9 @@ fn handle_park() {
 
     let abs_path = std::fs::canonicalize(&path).unwrap_or_else(|_| std::path::PathBuf::from(&path));
 
-    add_parked_path_logic(abs_path.to_string_lossy().to_string());
+    if let Err(e) = add_parked_path_logic(abs_path.to_string_lossy().to_string()) {
+        eprintln!("Error adding path: {}", e);
+    }
     println!("Parked: {}", abs_path.to_string_lossy());
 }
 
@@ -81,7 +83,9 @@ fn handle_unpark() {
     } else {
         env::current_dir().unwrap().to_string_lossy().to_string()
     };
-    remove_parked_path_logic(path.clone());
+    if let Err(e) = remove_parked_path_logic(path.clone()) {
+        eprintln!("Error removing path: {}", e);
+    }
     println!("Unparked: {}", path);
 }
 

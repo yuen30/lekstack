@@ -6,13 +6,98 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+use super::runtime::list_installed_versions;
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct Service {
+    id: String,
+    name: String,
+    version: String,
+    description: String,
+    status: String,
+}
+
+#[tauri::command]
+pub fn get_all_services() -> Vec<Service> {
+    let mut services = Vec::new();
+    let base_path = get_default_path();
+
+    // 1. Nginx
+    let nginx_status = get_service_status("nginx");
+    // Detect version?
+    let nginx_ver = get_active_version("nginx".to_string());
+    services.push(Service {
+        id: "nginx".to_string(),
+        name: "Nginx".to_string(),
+        version: if nginx_ver.is_empty() {
+            "Unknown".to_string()
+        } else {
+            nginx_ver
+        },
+        description: "Web Server".to_string(),
+        status: nginx_status,
+    });
+
+    // 2. MariaDB
+    let mariadb_status = get_service_status("mariadb");
+    let mariadb_ver = get_active_version("mariadb".to_string());
+    services.push(Service {
+        id: "mariadb".to_string(),
+        name: "MariaDB".to_string(),
+        version: if mariadb_ver.is_empty() {
+            "11.4.4".to_string()
+        } else {
+            mariadb_ver
+        }, // Default known
+        description: "Database Server".to_string(),
+        status: mariadb_status,
+    });
+
+    // 3. PostgreSQL
+    let pg_status = get_service_status("postgresql");
+    services.push(Service {
+        id: "postgresql".to_string(),
+        name: "PostgreSQL".to_string(),
+        version: "16.2".to_string(),
+        description: "Database Server".to_string(),
+        status: pg_status,
+    });
+
+    // 4. Redis
+    let redis_status = get_service_status("redis");
+    services.push(Service {
+        id: "redis".to_string(),
+        name: "Redis".to_string(),
+        version: "7.4.1".to_string(),
+        description: "In-memory Store".to_string(),
+        status: redis_status,
+    });
+
+    // 5. PHP Versions
+    let installed_phps = list_installed_versions("php");
+    for php_ver in installed_phps {
+        let service_name = format!("php-{}", php_ver);
+        // Check status of FPM
+        let fpm_status = get_service_status(&service_name);
+        services.push(Service {
+            id: service_name.clone(),
+            name: format!("PHP {}", php_ver),
+            version: php_ver,
+            description: "PHP-FPM".to_string(),
+            status: fpm_status,
+        });
+    }
+
+    services
+}
 // Helper to get port for current active PHP version
 fn get_php_port_for_active_version() -> u16 {
     let version = get_active_version("php".to_string());
     if version.is_empty() {
         return 9000;
     }
-    
+
     // Generate service name like php-8.2, php-8.3, etc.
     let service_name = format!("php-{}", version);
     get_service_port_value(&service_name)
@@ -27,11 +112,11 @@ pub fn generate_nginx_config(base_path: &PathBuf) -> PathBuf {
 
     let logs_dir = base_path.join("logs");
     let pids_dir = base_path.join("pids");
-    
+
     // Use ~/LekStack/Web as the default root instead of ~/.lekstack/html
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
     let html_dir = PathBuf::from(home).join("LekStack/Web");
-    
+
     // Create the directory if it doesn't exist
     if !html_dir.exists() {
         let _ = fs::create_dir_all(&html_dir);
@@ -164,7 +249,7 @@ fastcgi_param  SERVER_PORT        $server_port;
 
     // Fetch dynamic port from service settings with 8080 as fallback
     let nginx_port = get_service_port_value("nginx");
-    
+
     let conf_path = config_dir.join("nginx.conf");
     let conf_content = format!(
         r#"
@@ -320,11 +405,11 @@ pub fn start_service(name: String) -> bool {
 
     if name.contains("nginx") {
         let versions_dir = base_path.join("versions/nginx");
-        
+
         // Try to read active/default version from config first
         let config_path = base_path.join("config/active_versions.json");
         let mut nginx_bin = PathBuf::new();
-        
+
         if config_path.exists() {
             if let Ok(content) = fs::read_to_string(&config_path) {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -334,12 +419,12 @@ pub fn start_service(name: String) -> bool {
                 }
             }
         }
-        
+
         // Fallback to default or any installed version
         if !nginx_bin.exists() {
             nginx_bin = versions_dir.join("1.27.2/nginx");
         }
-        
+
         // If still not found, try to find any installed version
         if !nginx_bin.exists() {
             if let Ok(entries) = fs::read_dir(&versions_dir) {

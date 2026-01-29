@@ -22,7 +22,7 @@ export default function SettingsView() {
     invoke<string>('get_install_path')
       .then((path) => setInstallPath(path))
       .catch((err) => console.error('Failed to get path:', err));
-    
+
     // Fetch current ports
     Promise.all([
       invoke<number>('get_service_port', { name: 'nginx' }),
@@ -34,17 +34,19 @@ export default function SettingsView() {
       invoke<number>('get_service_port', { name: 'php-8.4' }),
       invoke<number>('get_service_port', { name: 'node' }),
       invoke<number>('get_service_port', { name: 'bun' }),
-    ]).then(([nginx, mariadb, postgresql, redis, php82, php83, php84, node, bun]) => {
-      setNginxPort(nginx);
-      setMariadbPort(mariadb);
-      setPostgresqlPort(postgresql);
-      setRedisPort(redis);
-      setPhpPort82(php82);
-      setPhpPort83(php83);
-      setPhpPort84(php84);
-      setNodePort(node);
-      setBunPort(bun);
-    }).catch((err) => console.error('Failed to get ports:', err));
+    ])
+      .then(([nginx, mariadb, postgresql, redis, php82, php83, php84, node, bun]) => {
+        setNginxPort(nginx);
+        setMariadbPort(mariadb);
+        setPostgresqlPort(postgresql);
+        setRedisPort(redis);
+        setPhpPort82(php82);
+        setPhpPort83(php83);
+        setPhpPort84(php84);
+        setNodePort(node);
+        setBunPort(bun);
+      })
+      .catch((err) => console.error('Failed to get ports:', err));
   }, []);
 
   const handleSave = async () => {
@@ -114,12 +116,13 @@ export default function SettingsView() {
             <button
               onClick={handleSave}
               disabled={status === 'saving'}
-              className={`px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 ${status === 'success'
+              className={`px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 ${
+                status === 'success'
                   ? 'bg-green-600 hover:bg-green-700 text-white'
                   : status === 'error'
                     ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                }`}
+              }`}
             >
               {status === 'saving' ? (
                 <span className="animate-spin">⏳</span>
@@ -136,12 +139,13 @@ export default function SettingsView() {
 
           {message && (
             <div
-              className={`text-sm flex items-center gap-2 px-3 py-2 rounded-lg ${status === 'success'
+              className={`text-sm flex items-center gap-2 px-3 py-2 rounded-lg ${
+                status === 'success'
                   ? 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20'
                   : status === 'error'
                     ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20'
                     : 'text-gray-500 bg-gray-50 dark:text-gray-400 dark:bg-gray-800'
-                }`}
+              }`}
             >
               {message}
             </div>
@@ -192,7 +196,9 @@ export default function SettingsView() {
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-gray-900 dark:text-white">MariaDB</label>
-              <p className="text-xs text-gray-500 dark:text-gray-400">MySQL-compatible database port</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                MySQL-compatible database port
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -213,8 +219,12 @@ export default function SettingsView() {
           {/* PostgreSQL Port */}
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-900 dark:text-white">PostgreSQL</label>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Advanced relational database port</p>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">
+                PostgreSQL
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Advanced relational database port
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <input

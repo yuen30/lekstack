@@ -1,8 +1,47 @@
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
+use tauri::ipc::InvokeError;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum LekStackError {
+    #[error("IO Error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("JSON Error: {0}")]
+    JsonError(#[from] serde_json::Error),
+    #[error("Runtime Error: {0}")]
+    RuntimeError(String),
+    #[error("Service Error: {0}")]
+    ServiceError(String),
+    #[error("Validation Error: {0}")]
+    ValidationError(String),
+    #[error("Reqwest Error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
+}
+
+impl From<String> for LekStackError {
+    fn from(err: String) -> Self {
+        LekStackError::RuntimeError(err)
+    }
+}
+
+impl From<&str> for LekStackError {
+    fn from(err: &str) -> Self {
+        LekStackError::RuntimeError(err.to_string())
+    }
+}
+
+impl From<LekStackError> for InvokeError {
+    fn from(err: LekStackError) -> Self {
+        InvokeError::from(err.to_string())
+    }
+}
+
+pub type Result<T> = std::result::Result<T, LekStackError>;
 
 // Helper to get default path
 pub fn get_default_path() -> PathBuf {
@@ -46,25 +85,56 @@ pub fn is_secured(name: &str) -> bool {
     cert.exists()
 }
 
-pub fn load_config() -> AppConfig {
+pub fn load_config() -> Result<AppConfig> {
     let config_path = get_default_path().join("config").join("settings.json");
-    if config_path.exists() {
-        if let Ok(content) = fs::read_to_string(&config_path) {
-            if let Ok(config) = serde_json::from_str(&content) {
-                return config;
-            }
-        }
+
+    if !config_path.exists() {
+        info!("Creating default config");
+        let default_config = AppConfig {
+            parked_paths: Vec::new(),
+        };
+        save_config(&default_config)?;
+        return Ok(default_config);
     }
-    // Default config
-    AppConfig {
-        parked_paths: Vec::new(),
-    }
+
+    let content = fs::read_to_string(&config_path).map_err(|e| LekStackError::IoError(e))?;
+
+    let config: AppConfig =
+        serde_json::from_str(&content).map_err(|e| LekStackError::JsonError(e))?;
+
+    validate_config(&config)?;
+
+    Ok(config)
 }
 
-pub fn save_config(config: &AppConfig) {
+pub fn save_config(config: &AppConfig) -> Result<()> {
+    validate_config(config)?;
+
     let config_path = get_default_path().join("config").join("settings.json");
-    let _ = fs::create_dir_all(config_path.parent().unwrap());
-    let _ = fs::write(&config_path, serde_json::to_string_pretty(config).unwrap());
+    fs::create_dir_all(config_path.parent().unwrap()).map_err(|e| LekStackError::IoError(e))?;
+
+    fs::write(&config_path, serde_json::to_string_pretty(config)?)
+        .map_err(|e| LekStackError::IoError(e))?;
+
+    info!("Config saved successfully");
+    Ok(())
+}
+
+pub fn validate_config(config: &AppConfig) -> Result<()> {
+    // Validate parked paths
+    for path in &config.parked_paths {
+        if path.is_empty() {
+            return Err(LekStackError::ValidationError(
+                "Parked path cannot be empty".to_string(),
+            ));
+        }
+        if !PathBuf::from(path).exists() {
+            warn!("Parked path does not exist: {}", path);
+            // Don't fail, just warn
+        }
+    }
+
+    Ok(())
 }
 
 pub fn get_service_port_value(name: &str) -> u16 {
@@ -112,7 +182,7 @@ pub fn get_service_port_value(name: &str) -> u16 {
     default_port
 }
 
-pub async fn ensure_mkcert(base_path: &PathBuf) -> Result<(), String> {
+pub async fn ensure_mkcert(base_path: &PathBuf) -> Result<()> {
     let bin_dir = base_path.join("bin");
     let mkcert_bin = bin_dir.join("mkcert");
 
@@ -124,18 +194,21 @@ pub async fn ensure_mkcert(base_path: &PathBuf) -> Result<(), String> {
             .arg(&mkcert_bin)
             .arg("https://dl.filippo.io/mkcert/latest?for=linux/amd64")
             .status()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| LekStackError::RuntimeError(e.to_string()))?;
 
         if !status.success() {
-            return Err("Failed to download mkcert".to_string());
+            return Err(LekStackError::RuntimeError(
+                "Failed to download mkcert".to_string(),
+            ));
         }
 
         // Make executable
         let mut perms = fs::metadata(&mkcert_bin)
-            .map_err(|e| e.to_string())?
+            .map_err(|e| LekStackError::RuntimeError(e.to_string()))?
             .permissions();
         perms.set_mode(0o755);
-        fs::set_permissions(&mkcert_bin, perms).map_err(|e| e.to_string())?;
+        fs::set_permissions(&mkcert_bin, perms)
+            .map_err(|e| LekStackError::RuntimeError(e.to_string()))?;
     }
     Ok(())
 }

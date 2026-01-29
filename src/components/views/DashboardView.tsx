@@ -2,16 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  Server,
-  Database,
-  Globe,
-  Zap,
-  RotateCcw,
-  LayoutGrid,
-  X,
-  Terminal,
-} from 'lucide-react';
+import { Server, Database, Globe, Zap, RotateCcw, LayoutGrid, X, Terminal } from 'lucide-react';
 import ServiceCard from '../ServiceCard';
 import { toast } from 'sonner';
 
@@ -70,7 +61,7 @@ export default function DashboardView() {
   const [siteCount, setSiteCount] = useState(0);
   const [dbCount, setDbCount] = useState(0);
   const [isRestartingAll, setIsRestartingAll] = useState(false);
-  
+
   // Log Viewer State
   const [showLogs, setShowLogs] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -128,13 +119,15 @@ export default function DashboardView() {
             }
 
             const status = await invoke<string>('get_service_status', { name: id });
-            const activeVersion = await invoke<string>('get_active_version', { runtime: runtimeName });
-            
+            const activeVersion = await invoke<string>('get_active_version', {
+              runtime: runtimeName,
+            });
+
             // For PHP cards that have specific version in ID (like php-8.2)
             // if it's the active version, we show it. Otherwise we show the ID version.
             let displayVersion = activeVersion || installed[0] || '';
             if (id.startsWith('php-') && id !== `php-${activeVersion}`) {
-              // If this is a specific PHP card but not the active one, 
+              // If this is a specific PHP card but not the active one,
               // show its own version from ID
               displayVersion = id.replace('php-', '');
             }
@@ -391,8 +384,8 @@ export default function DashboardView() {
                 onToggle={() => toggleService(service.id)}
                 onViewLogs={() => openLogs(service)}
                 onOpen={
-                  service.id === 'nginx' 
-                    ? () => openBrowser(service.id) 
+                  service.id === 'nginx'
+                    ? () => openBrowser(service.id)
                     : service.id === 'node' || service.id === 'bun'
                       ? () => openBrowser(service.id)
                       : undefined
@@ -460,7 +453,9 @@ export default function DashboardView() {
                   className="flex-1 overflow-auto text-gray-300 custom-scrollbar whitespace-pre-wrap break-all"
                 >
                   {logs || 'Waiting for logs...'}
-                  {logLoading && <span className="inline-block ml-2 animate-pulse text-indigo-400">_</span>}
+                  {logLoading && (
+                    <span className="inline-block ml-2 animate-pulse text-indigo-400">_</span>
+                  )}
                 </pre>
               </div>
 

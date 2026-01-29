@@ -567,10 +567,11 @@ export default function DatabaseManagerView() {
                     onClick={() => toggleService(svc.id, svc.status as string)}
                     disabled={actionLoading === svc.id}
                     className={`col-span-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all font-medium border active:scale-95
-                            ${svc.status === 'running'
-                        ? 'bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:bg-transparent dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20'
-                        : 'col-span-2 bg-green-600 border-transparent text-white hover:bg-green-700 shadow-lg shadow-green-600/20 dark:bg-green-600'
-                      }`}
+                            ${
+                              svc.status === 'running'
+                                ? 'bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:bg-transparent dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20'
+                                : 'col-span-2 bg-green-600 border-transparent text-white hover:bg-green-700 shadow-lg shadow-green-600/20 dark:bg-green-600'
+                            }`}
                   >
                     {actionLoading === svc.id ? (
                       <Loader2 className="animate-spin" size={18} />

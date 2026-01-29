@@ -1,5 +1,13 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Loader2, AlertCircle, CheckCircle2, FileText, ExternalLink } from 'lucide-react';
+import {
+  Play,
+  Square,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+  ExternalLink,
+} from 'lucide-react';
 
 interface ServiceCardProps {
   name: string;
@@ -28,16 +36,20 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 
   return (
     <motion.div
-      whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' }}
+      whileHover={{
+        y: -4,
+        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+      }}
       className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-100 dark:border-gray-800 p-6 flex flex-col h-full transition-shadow group"
     >
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-4">
           <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isRunning
-              ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-              : 'bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
-              }`}
+            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+              isRunning
+                ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+                : 'bg-gray-50 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+            }`}
           >
             {icon}
           </div>
@@ -63,10 +75,11 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             onToggle();
           }}
           disabled={isLoading}
-          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isRunning
-            ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30'
-            : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30'
-            } ${isLoading ? 'opacity-50 cursor-wait' : ''}`}
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+            isRunning
+              ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30'
+              : 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30'
+          } ${isLoading ? 'opacity-50 cursor-wait' : ''}`}
           title={isRunning ? 'Stop Service' : 'Start Service'}
         >
           <AnimatePresence mode="wait">
@@ -142,7 +155,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               Open
             </button>
           )}
-          
+
           {onViewLogs && (
             <button
               onClick={onViewLogs}

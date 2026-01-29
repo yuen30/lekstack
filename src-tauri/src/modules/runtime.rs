@@ -1,4 +1,4 @@
-use super::common::get_default_path;
+use super::common::{get_default_path, LekStackError, Result};
 use super::site::add_parked_path_logic;
 use futures_util::StreamExt;
 use std::fs;
@@ -8,21 +8,42 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
 use tauri::{Emitter, Window};
+use log::{info, error, warn};
+use std::collections::HashMap;
 
 #[tauri::command]
-pub fn get_install_path() -> String {
-    get_default_path().to_string_lossy().to_string()
+pub fn get_active_versions() -> HashMap<String, String> {
+    let base_path = get_default_path();
+    let config_path = base_path.join("config/active_versions.json");
+    
+    if config_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_path) {
+            if let Ok(json) = serde_json::from_str::<HashMap<String, String>>(&content) {
+                return json;
+            }
+        }
+    }
+    HashMap::new()
 }
 
 #[tauri::command]
-pub fn init_environment() -> Result<String, String> {
+pub fn get_install_path() -> Result<String> {
+    Ok(get_default_path().to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn init_environment() -> Result<String> {
+    info!("Initializing LekStack environment");
+    
     let base_path = get_default_path();
     let dirs = vec!["bin", "config", "logs", "pids", "valet", "versions", "data"];
 
     for dir in dirs {
         let p = base_path.join(dir);
         if !p.exists() {
-            fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+            fs::create_dir_all(&p)
+                .map_err(|e| LekStackError::IoError(e))?;
+            info!("Created directory: {}", p.to_string_lossy());
         }
     }
 
@@ -30,16 +51,21 @@ pub fn init_environment() -> Result<String, String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
     let projects_dir = PathBuf::from(home).join("LekStack/Web");
     if !projects_dir.exists() {
-        fs::create_dir_all(&projects_dir).map_err(|e| e.to_string())?;
-        let _ = fs::write(
+        fs::create_dir_all(&projects_dir)
+            .map_err(|e| LekStackError::IoError(e))?;
+        fs::write(
             projects_dir.join("index.php"),
             "<?php echo '<h1>Welcome to LekStack</h1><p>This file is located at ~/LekStack/Web/index.php</p>'; phpinfo(); ?>",
-        );
+        ).map_err(|e| LekStackError::IoError(e))?;
+        info!("Created projects directory at {}", projects_dir.to_string_lossy());
     }
 
     // Auto-park the new projects directory if not already parked
-    add_parked_path_logic(projects_dir.to_string_lossy().to_string());
+    if let Err(e) = add_parked_path_logic(projects_dir.to_string_lossy().to_string()) {
+        warn!("Failed to auto-park projects directory: {}", e);
+    }
 
+    info!("Environment initialized successfully");
     Ok(base_path.to_string_lossy().to_string())
 }
 
@@ -47,6 +73,7 @@ pub fn init_environment() -> Result<String, String> {
 pub fn list_installed_versions(runtime: &str) -> Vec<String> {
     let base_path = get_default_path().join("versions").join(runtime);
     let mut versions = Vec::new();
+
 
     if base_path.exists() {
         if let Ok(entries) = fs::read_dir(&base_path) {
@@ -74,7 +101,7 @@ pub async fn install_runtime(
     window: Window,
     runtime: String,
     version: String,
-) -> Result<String, String> {
+) -> Result<String> {
     println!("Installing {} v{}", runtime, version);
     let base_path = get_default_path();
     let version_path = base_path.join("versions").join(&runtime).join(&version);
@@ -95,7 +122,7 @@ pub async fn install_runtime(
             // Use GitHub Releases - now that repo is public, direct download should work
             // Build these using: .github/workflows/build-php.yml
             // Updated: January 2026 - Latest patch versions
-            let (download_version, short_ver) = match version.as_str() {
+            let (download_version, _short_ver) = match version.as_str() {
                 "8.2" => ("8.2.30", "8.2"),  // Security support only (until Dec 2026)
                 "8.3" => ("8.3.30", "8.3"),  // Recommended - LTS (until Dec 2027)
                 "8.4" => ("8.4.17", "8.4"),  // Latest Stable (until Dec 2028)
@@ -128,7 +155,7 @@ pub async fn install_runtime(
         "redis" => vec![
             ("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/redis-7.4.1-linux-amd64.jar".to_string(), "redis.jar")
         ],
-        _ => return Err("Unsupported runtime".to_string()),
+        _ => return Err(LekStackError::RuntimeError("Unsupported runtime".to_string())),
     };
 
     for (url, archive_name) in downloads {
@@ -140,20 +167,20 @@ pub async fn install_runtime(
             .get(&url)
             .send()
             .await
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .map_err(|e| LekStackError::RuntimeError(format!("Request failed: {}", e)))?;
 
         if !res.status().is_success() {
-            return Err(format!("Download failed: HTTP {}", res.status()));
+            return Err(LekStackError::RuntimeError(format!("Download failed: HTTP {}", res.status())));
         }
 
         let total_size = res.content_length().unwrap_or(0);
-        let mut file = fs::File::create(&archive_path).map_err(|e| e.to_string())?;
+        let mut file = fs::File::create(&archive_path).map_err(|e| LekStackError::IoError(e))?;
         let mut downloaded: u64 = 0;
         let mut stream = res.bytes_stream();
 
         while let Some(item) = stream.next().await {
-            let chunk = item.map_err(|e| e.to_string())?;
-            file.write_all(&chunk).map_err(|e| e.to_string())?;
+            let chunk = item.map_err(|e| LekStackError::RuntimeError(e.to_string()))?;
+            file.write_all(&chunk).map_err(|e| LekStackError::IoError(e))?;
             downloaded += chunk.len() as u64;
             let _ = window.emit("download_progress", serde_json::json!({
                 "current": downloaded,
@@ -181,8 +208,8 @@ pub async fn install_runtime(
                 .arg("-d")
                 .arg(&version_path)
                 .status();
-            if !unzip_status.map_err(|e| e.to_string())?.success() {
-                return Err("Failed to unzip jar".to_string());
+            if !unzip_status.map_err(|e| LekStackError::RuntimeError(e.to_string()))?.success() {
+                return Err(LekStackError::RuntimeError("Failed to unzip jar".to_string()));
             }
 
             // Find txz
@@ -242,7 +269,7 @@ pub async fn install_runtime(
                 }
                 Ok(std::process::ExitStatus::default())
             } else {
-                return Err("No txz found in jar".to_string());
+                return Err(LekStackError::RuntimeError("No txz found in jar".to_string()));
             }
         } else {
             let mut cmd = Command::new("tar");
@@ -256,8 +283,8 @@ pub async fn install_runtime(
             cmd.status()
         };
 
-        if !extract_status.map_err(|e| e.to_string())?.success() {
-            return Err("Extraction failed".to_string());
+        if !extract_status.map_err(|e| LekStackError::RuntimeError(e.to_string()))?.success() {
+            return Err(LekStackError::RuntimeError("Extraction failed".to_string()));
         }
         let _ = fs::remove_file(archive_path);
 
@@ -325,18 +352,18 @@ pub async fn install_runtime(
 }
 
 #[tauri::command]
-pub async fn update_global_shims(runtime: String, version: String) -> Result<String, String> {
+pub async fn update_global_shims(runtime: String, version: String) -> Result<String> {
     let base_path = get_default_path();
     let bin_dir = base_path.join("bin");
     if !bin_dir.exists() {
-        fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&bin_dir).map_err(|e| LekStackError::IoError(e))?;
     }
     let version_path = base_path.join("versions").join(&runtime).join(&version);
     if !version_path.exists() {
-        return Err(format!(
+        return Err(LekStackError::RuntimeError(format!(
             "Version {} v{} is not installed.",
             runtime, version
-        ));
+        )));
     }
 
     match runtime.as_str() {
@@ -347,9 +374,9 @@ pub async fn update_global_shims(runtime: String, version: String) -> Result<Str
                 if target_link.exists() {
                     let _ = fs::remove_file(&target_link);
                 }
-                symlink(&source_bin, &target_link).map_err(|e| e.to_string())?;
+                symlink(&source_bin, &target_link).map_err(|e| LekStackError::IoError(e))?;
             } else {
-                return Err("PHP binary not found".to_string());
+                return Err(LekStackError::RuntimeError("PHP binary not found".to_string()));
             }
             ensure_composer(&base_path).await?;
         }
@@ -362,7 +389,7 @@ pub async fn update_global_shims(runtime: String, version: String) -> Result<Str
                     if target.exists() {
                         let _ = fs::remove_file(&target);
                     }
-                    symlink(&source, &target).map_err(|e| e.to_string())?;
+                    symlink(&source, &target).map_err(|e| LekStackError::IoError(e))?;
                 }
             }
         }
@@ -378,7 +405,7 @@ pub async fn update_global_shims(runtime: String, version: String) -> Result<Str
                 if target_bunx.exists() {
                     let _ = fs::remove_file(&target_bunx);
                 }
-                symlink(&source, &target_bunx).map_err(|e| e.to_string())?;
+                symlink(&source, &target_bunx).map_err(|e| LekStackError::IoError(e))?;
             }
         }
         _ => {}
@@ -409,7 +436,7 @@ pub async fn update_global_shims(runtime: String, version: String) -> Result<Str
     Ok("Global version updated".to_string())
 }
 
-async fn ensure_composer(base_path: &PathBuf) -> Result<(), String> {
+async fn ensure_composer(base_path: &PathBuf) -> Result<()> {
     let bin_dir = base_path.join("bin");
     let composer_phar = bin_dir.join("composer.phar");
     let composer_wrapper = bin_dir.join("composer");
@@ -421,9 +448,9 @@ async fn ensure_composer(base_path: &PathBuf) -> Result<(), String> {
             .arg(&composer_phar)
             .arg("https://getcomposer.org/composer.phar")
             .status()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| LekStackError::RuntimeError(e.to_string()))?;
         if !status.success() {
-            return Err("Failed to download composer.phar".to_string());
+            return Err(LekStackError::RuntimeError("Failed to download composer.phar".to_string()));
         }
     }
 
@@ -436,26 +463,26 @@ exec "{}" "{}" "$@"
         composer_phar.to_string_lossy()
     );
 
-    fs::write(&composer_wrapper, wrapper_content).map_err(|e| e.to_string())?;
+    fs::write(&composer_wrapper, wrapper_content).map_err(|e| LekStackError::IoError(e))?;
 
     let mut perms = fs::metadata(&composer_wrapper)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| LekStackError::IoError(e))?
         .permissions();
     perms.set_mode(0o755);
-    fs::set_permissions(&composer_wrapper, perms).map_err(|e| e.to_string())?;
+    fs::set_permissions(&composer_wrapper, perms).map_err(|e| LekStackError::IoError(e))?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn uninstall_runtime(runtime: String, version: String) -> Result<String, String> {
+pub fn uninstall_runtime(runtime: String, version: String) -> Result<String> {
     let base_path = get_default_path();
     let version_path = base_path.join("versions").join(&runtime).join(&version);
 
     if !version_path.exists() {
-        return Err(format!("Version {} v{} is not installed.", runtime, version));
+        return Err(LekStackError::RuntimeError(format!("Version {} v{} is not installed.", runtime, version)));
     }
 
-    fs::remove_dir_all(&version_path).map_err(|e| format!("Failed to delete directory: {}", e))?;
+    fs::remove_dir_all(&version_path).map_err(|e| LekStackError::RuntimeError(format!("Failed to delete directory: {}", e)))?;
 
     Ok(format!("{} v{} uninstalled successfully.", runtime, version))
 }

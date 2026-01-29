@@ -71,13 +71,27 @@ pub fn get_service_port_value(name: &str) -> u16 {
     let base_path = get_default_path();
     let config_path = base_path.join("config/services.json");
 
-    // Default ports
+    // Default ports mapping
     let default_port = match name {
         "nginx" => 8080,
         "mariadb" => 3306,
         "postgresql" => 5432,
         "redis" => 6379,
-        _ => 0,
+        "php-7.4" => 9074,
+        "php-8.0" => 9080,
+        "php-8.1" => 9081,
+        "php-8.2" => 9082,
+        "php-8.3" => 9083,
+        "php-8.4" => 9084,
+        "php-8.5" => 9085,
+        _ => {
+            // Dynamic PHP version fallback
+            if name.starts_with("php-") {
+                9000
+            } else {
+                0
+            }
+        }
     };
 
     if config_path.exists() {

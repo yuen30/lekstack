@@ -92,17 +92,30 @@ pub async fn install_runtime(
             (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/bun-v1.0.0-linux-x64.zip"), "archive.zip")
         ],
         "php" => {
-            let download_version = match version.as_str() {
-                "8.2" => "8.2.30",
-                "8.3" => "8.3.30",
-                "8.4" => "8.4.17",
-                "8.5" => "8.5.2",
-                _ => "8.2.30",
+            // Use GitHub Actions pre-built binaries with real PHP-FPM
+            // Build these using: .github/workflows/build-php.yml
+            // Updated: January 2026 - Latest patch versions
+            let (download_version, short_ver) = match version.as_str() {
+                "8.2" => ("8.2.30", "8.2"),  // Security support only (until Dec 2026)
+                "8.3" => ("8.3.30", "8.3"),  // Recommended - LTS (until Dec 2027)
+                "8.4" => ("8.4.17", "8.4"),  // Latest Stable (until Dec 2028)
+                "8.5" => ("8.5.2", "8.5"),   // Bleeding Edge (until Dec 2029)
+                _ => ("8.3.30", "8.3"),      // Default to 8.3 (most stable)
             };
-            vec![
-                (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
-                (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/php-{}-fpm-linux-x86_64.tar.gz", download_version), "php-fpm.tar.gz")
-            ]
+            
+            // For PHP 8.5, use static-php-cli as fallback until GitHub Actions build is available
+            if version == "8.5" {
+                vec![
+                    (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
+                    (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-micro-linux-x86_64.tar.gz", download_version), "php-micro.tar.gz")
+                ]
+            } else {
+                // Download CLI and FPM separately for better efficiency
+                vec![
+                    (format!("https://github.com/taweechai/LekStack/releases/download/php-{}/php-{}-cli-linux-x86_64.tar.gz", download_version, download_version), "php-cli.tar.gz"),
+                    (format!("https://github.com/taweechai/LekStack/releases/download/php-{}/php-{}-fpm-linux-x86_64.tar.gz", download_version, download_version), "php-fpm.tar.gz")
+                ]
+            }
         },
         "nginx" => {
             let (download_url, archive_name) = match version.as_str() {
@@ -292,11 +305,27 @@ pub async fn install_runtime(
         let sbin_dir = version_path.join("sbin");
         fs::create_dir_all(&bin_dir).ok();
         fs::create_dir_all(&sbin_dir).ok();
+        
+        // Move binaries from extracted location to proper directories
+        // The GitHub Actions build creates these in bin/ and sbin/ already
         if version_path.join("php").exists() {
-            fs::rename(version_path.join("php"), bin_dir.join("php")).ok();
+            let target = bin_dir.join("php");
+            fs::rename(version_path.join("php"), &target).ok();
+            if let Ok(metadata) = fs::metadata(&target) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&target, perms).ok();
+            }
         }
+        
         if version_path.join("php-fpm").exists() {
-            fs::rename(version_path.join("php-fpm"), sbin_dir.join("php-fpm")).ok();
+            let target = sbin_dir.join("php-fpm");
+            fs::rename(version_path.join("php-fpm"), &target).ok();
+            if let Ok(metadata) = fs::metadata(&target) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&target, perms).ok();
+            }
         }
     }
 

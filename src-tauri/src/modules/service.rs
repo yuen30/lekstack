@@ -1,9 +1,22 @@
 use super::common::{get_default_path, get_service_port_value};
 use super::database::{init_mariadb_data, init_postgresql_data};
+use super::runtime::get_active_version;
 use std::fs;
 // use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+
+// Helper to get port for current active PHP version
+fn get_php_port_for_active_version() -> u16 {
+    let version = get_active_version("php".to_string());
+    if version.is_empty() {
+        return 9000;
+    }
+    
+    // Generate service name like php-8.2, php-8.3, etc.
+    let service_name = format!("php-{}", version);
+    get_service_port_value(&service_name)
+}
 
 // Helper to generate basic nginx config
 pub fn generate_nginx_config(base_path: &PathBuf) -> PathBuf {
@@ -183,7 +196,7 @@ http {{
         }}
 
         location ~ \.php$ {{
-            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_pass   127.0.0.1:{};
             fastcgi_index  index.php;
             include        fastcgi_params;
             fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
@@ -196,7 +209,8 @@ http {{
         logs_dir.to_string_lossy(),
         config_dir.to_string_lossy(),
         nginx_port,
-        html_dir.to_string_lossy()
+        html_dir.to_string_lossy(),
+        get_php_port_for_active_version()
     );
 
     let _ = fs::write(&conf_path, conf_content);
@@ -211,12 +225,21 @@ pub fn generate_php_config(base_path: &PathBuf, version: &str, port: u16) -> Pat
     if !socket_dir.exists() {
         let _ = fs::create_dir_all(&socket_dir);
     }
+    if !config_dir.exists() {
+        let _ = fs::create_dir_all(&config_dir);
+    }
+    if !logs_dir.exists() {
+        let _ = fs::create_dir_all(&logs_dir);
+    }
+    if !pids_dir.exists() {
+        let _ = fs::create_dir_all(&pids_dir);
+    }
 
     let fpm_conf_path = config_dir.join(format!("php-{}-fpm.conf", version));
     let fpm_content = format!(
         r#"
 [global]
-pid = {}/php-{}-fpm.pid
+pid = {}/php-{}.pid
 error_log = {}/php-{}-fpm.log
 daemonize = no
 
@@ -355,21 +378,9 @@ pub fn start_service(name: String) -> bool {
             return false;
         }
 
-        let port = if version.starts_with("7.4") {
-            9074
-        } else if version.starts_with("8.0") {
-            9080
-        } else if version.starts_with("8.1") {
-            9081
-        } else if version.starts_with("8.2") {
-            9082
-        } else if version.starts_with("8.3") {
-            9083
-        } else if version.starts_with("8.4") {
-            9084
-        } else {
-            9000
-        };
+        // Use the configured port for this PHP version from services.json
+        let service_name = format!("php-{}", version);
+        let port = get_service_port_value(&service_name);
 
         let config_path = generate_php_config(&base_path, version, port);
         let ini_path = base_path

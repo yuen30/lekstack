@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Download, RefreshCw, Check, Trash2, Search, Globe } from 'lucide-react';
+import { Download, RefreshCw, Check, Trash2, Search, Globe, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import bunLogo from '../../assets/bun-logo.svg';
 import phpLogo from '../../assets/php-logo.svg';
 import nodeLogo from '../../assets/node-logo.svg';
+import PhpIniEditor from '../PhpIniEditor';
 
 interface Version {
   version: string;
@@ -14,10 +15,10 @@ interface Version {
 }
 
 const PHP_VERSIONS: Version[] = [
-  { version: '8.5', status: 'not_installed', releaseDate: 'Jan 2026', tags: ['Current Stable'] },
-  { version: '8.4', status: 'not_installed', releaseDate: 'Jan 2026', tags: ['Old Stable'] },
-  { version: '8.3', status: 'not_installed', releaseDate: 'Jan 2026', tags: ['Old Stable'] },
-  { version: '8.2', status: 'active', releaseDate: 'Dec 2025', tags: ['Old Stable', 'Default'] },
+  { version: '8.5', status: 'not_installed', releaseDate: 'Nov 2025', tags: ['Latest', 'Bleeding Edge'] },
+  { version: '8.4', status: 'not_installed', releaseDate: 'Nov 2024', tags: ['Stable', 'Recommended'] },
+  { version: '8.3', status: 'active', releaseDate: 'Nov 2023', tags: ['LTS', 'Default'] },
+  { version: '8.2', status: 'not_installed', releaseDate: 'Dec 2022', tags: ['Security Only'] },
 ];
 
 const NODE_VERSIONS: Version[] = [
@@ -81,6 +82,8 @@ export default function VersionManagerView() {
   const [nodeVersions, setNodeVersions] = useState(NODE_VERSIONS);
   const [bunVersions, setBunVersions] = useState(BUN_VERSIONS);
   const [nginxVersions, setNginxVersions] = useState(NGINX_VERSIONS);
+  const [showPhpIniEditor, setShowPhpIniEditor] = useState(false);
+  const [editingPhpVersion, setEditingPhpVersion] = useState<string>('');
 
   // Fetch installed versions and active version from backend
   useEffect(() => {
@@ -219,6 +222,11 @@ export default function VersionManagerView() {
       console.error('Failed to set global version:', error);
       toast.error(`Failed to set global version: ${error}`);
     }
+  };
+
+  const openPhpIniEditor = (version: string) => {
+    setEditingPhpVersion(version);
+    setShowPhpIniEditor(true);
   };
 
   const currentList =
@@ -387,6 +395,15 @@ export default function VersionManagerView() {
                       >
                         <Globe size={16} />
                       </button>
+                      {activeTab === 'php' && (
+                        <button
+                          onClick={() => openPhpIniEditor(ver.version)}
+                          className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title={`Edit php.ini for PHP ${ver.version}`}
+                        >
+                          <Settings size={16} />
+                        </button>
+                      )}
                       {ver.status !== 'active' && (
                         <button
                           onClick={() => uninstallVersion(ver.version, activeTab)}
@@ -410,6 +427,12 @@ export default function VersionManagerView() {
           </tbody>
         </table>
       </div>
+
+      <PhpIniEditor
+        version={editingPhpVersion}
+        isOpen={showPhpIniEditor}
+        onClose={() => setShowPhpIniEditor(false)}
+      />
     </div>
   );
 }

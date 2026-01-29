@@ -1,0 +1,212 @@
+name: Build PHP Binaries with FPM
+
+on:
+  workflow_dispatch:
+    inputs:
+      php_version:
+        description: 'PHP Version to build (e.g., 8.3.16)'
+        required: true
+        type: string
+      short_version:
+        description: 'Short version for tagging (e.g., 8.3)'
+        required: true
+        type: string
+
+jobs:
+  build-php:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            autoconf \
+            libtool \
+            bison \
+            re2c \
+            pkg-config \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            libxml2-dev \
+            libsqlite3-dev \
+            libonig-dev \
+            libzip-dev \
+            libpng-dev \
+            libjpeg-dev \
+            libfreetype6-dev \
+            libwebp-dev \
+            libxpm-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libgmp-dev \
+            libldap2-dev \
+            libsasl2-dev \
+            libpq-dev \
+            libsodium-dev \
+            libargon2-dev
+
+      - name: Download PHP Source
+        run: |
+          wget https://www.php.net/distributions/php-${{ github.event.inputs.php_version }}.tar.gz
+          tar -xzf php-${{ github.event.inputs.php_version }}.tar.gz
+
+      - name: Configure PHP
+        run: |
+          cd php-${{ github.event.inputs.php_version }}
+          ./configure \
+            --prefix=/opt/php-${{ github.event.inputs.php_version }} \
+            --enable-fpm \
+            --with-fpm-user=www-data \
+            --with-fpm-group=www-data \
+            --enable-cli \
+            --enable-mbstring \
+            --enable-mbregex \
+            --enable-opcache \
+            --enable-bcmath \
+            --enable-calendar \
+            --enable-exif \
+            --enable-ftp \
+            --enable-gd \
+            --enable-intl \
+            --enable-pcntl \
+            --enable-shmop \
+            --enable-soap \
+            --enable-sockets \
+            --enable-sysvmsg \
+            --enable-sysvsem \
+            --enable-sysvshm \
+            --with-openssl \
+            --with-curl \
+            --with-zlib \
+            --with-bz2 \
+            --with-zip \
+            --with-readline \
+            --with-mysqli \
+            --with-pdo-mysql \
+            --with-pdo-pgsql \
+            --with-pgsql \
+            --with-gmp \
+            --with-ldap \
+            --with-sodium \
+            --with-password-argon2 \
+            --with-jpeg \
+            --with-freetype \
+            --with-webp \
+            --with-xpm
+
+      - name: Build PHP
+        run: |
+          cd php-${{ github.event.inputs.php_version }}
+          make -j$(nproc)
+
+      - name: Install PHP to staging directory
+        run: |
+          cd php-${{ github.event.inputs.php_version }}
+          make install INSTALL_ROOT=${{ github.workspace }}/php-staging
+
+      - name: Create CLI Archive
+        run: |
+          cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
+          # CLI binary only
+          tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz \
+            bin/php \
+            lib/php.ini-* \
+            include/ \
+            lib/php/
+
+      - name: Create FPM Archive
+        run: |
+          cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
+          # FPM binary and required files
+          tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz \
+            sbin/php-fpm \
+            etc/ \
+            var/
+
+      - name: Create Full Archive
+        run: |
+          cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
+          # Complete PHP installation
+          tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
+
+      - name: Generate checksums
+        run: |
+          cd ${{ github.workspace }}
+          sha256sum php-${{ github.event.inputs.php_version }}-*.tar.gz > checksums-${{ github.event.inputs.php_version }}.txt
+          cat checksums-${{ github.event.inputs.php_version }}.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: php-${{ github.event.inputs.php_version }}
+          name: PHP ${{ github.event.inputs.php_version }} Binaries
+          body: |
+            ## PHP ${{ github.event.inputs.php_version }} - Linux x86_64 Binaries
+            
+            Built with the following features:
+            - ✅ PHP-FPM (FastCGI Process Manager)
+            - ✅ CLI (Command Line Interface)
+            - ✅ OpenSSL, cURL, Zlib
+            - ✅ MySQL/MariaDB (mysqli, PDO)
+            - ✅ PostgreSQL (pgsql, PDO)
+            - ✅ GD (JPEG, PNG, WebP, FreeType)
+            - ✅ mbstring, intl, opcache
+            - ✅ bcmath, gmp, sodium
+            - ✅ ZIP, BZ2, readline
+            - ✅ SOAP, sockets, FTP
+            
+            ### Available Downloads:
+            
+            - **`php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz`** - CLI binary only (~15MB)
+            - **`php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz`** - FPM binary and configs (~5MB)
+            - **`php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz`** - Complete installation (~50MB)
+            
+            ### Installation:
+            
+            ```bash
+            # Extract to ~/.lekstack/versions/php/${{ github.event.inputs.short_version }}/
+            wget https://github.com/${{ github.repository }}/releases/download/php-${{ github.event.inputs.php_version }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz
+            mkdir -p ~/.lekstack/versions/php/${{ github.event.inputs.short_version }}
+            tar -xzf php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz -C ~/.lekstack/versions/php/${{ github.event.inputs.short_version }}/
+            ```
+            
+            ### Verify checksums:
+            
+            ```bash
+            sha256sum -c checksums-${{ github.event.inputs.php_version }}.txt
+            ```
+            
+            ---
+            
+            🤖 Built automatically with GitHub Actions
+            📅 Build date: ${{ github.event.repository.updated_at }}
+            🔧 Builder: ubuntu-22.04
+          files: |
+            php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz
+            php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz
+            php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz
+            checksums-${{ github.event.inputs.php_version }}.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update build summary
+        run: |
+          echo "## ✅ PHP ${{ github.event.inputs.php_version }} Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 File Sizes:" >> $GITHUB_STEP_SUMMARY
+          ls -lh php-${{ github.event.inputs.php_version }}-*.tar.gz >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔐 Checksums:" >> $GITHUB_STEP_SUMMARY
+          cat checksums-${{ github.event.inputs.php_version }}.txt >> $GITHUB_STEP_SUMMARY

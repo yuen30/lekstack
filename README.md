@@ -86,4 +86,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-Developed with ❤️ by [Your Name/GitHub Handle]
+Developed with ❤️ by [Taweechai Yuenyang](https://github.com/yuen30)

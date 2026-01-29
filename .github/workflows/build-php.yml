@@ -12,6 +12,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   build-php:
     runs-on: ubuntu-22.04
@@ -48,7 +51,9 @@ jobs:
             libsasl2-dev \
             libpq-dev \
             libsodium-dev \
-            libargon2-dev
+            libargon2-dev \
+            libxslt1-dev \
+            libffi-dev
 
       - name: Download PHP Source
         run: |
@@ -97,7 +102,10 @@ jobs:
             --with-jpeg \
             --with-freetype \
             --with-webp \
-            --with-xpm
+            --with-xpm \
+            --with-xsl \
+            --with-gettext \
+            --enable-ffi
 
       - name: Build PHP
         run: |
@@ -108,6 +116,15 @@ jobs:
         run: |
           cd php-${{ github.event.inputs.php_version }}
           make install INSTALL_ROOT=${{ github.workspace }}/php-staging
+
+      - name: Verify Build
+        run: |
+          echo "Verifying CLI binary..."
+          ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}/bin/php -v
+          
+          echo "Verifying loaded modules..."
+          ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}/bin/php -m
+
 
       - name: Create CLI Archive
         run: |
@@ -196,7 +213,15 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           sha256sum php-${{ github.event.inputs.php_version }}-*.tar.gz > checksums-${{ github.event.inputs.php_version }}.txt
-          cat checksums-${{ github.event.inputs.php_version }}.txt
+          checksums-${{ github.event.inputs.php_version }}.txt
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-${{ github.event.inputs.php_version }}-binaries
+          path: php-${{ github.event.inputs.php_version }}-*.tar.gz
+          retention-days: 90
+
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

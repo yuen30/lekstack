@@ -53,8 +53,8 @@ jobs:
             libsodium-dev \
             libargon2-dev \
             libxslt1-dev \
-            libffi-dev \
-            libtidy-dev
+            libxslt1-dev \
+            libffi-dev
 
       - name: Download PHP Source
         run: |
@@ -109,7 +109,6 @@ jobs:
             --enable-ffi \
             --with-sqlite3 \
             --with-pdo-sqlite \
-            --with-tidy \
             --with-iconv
 
       - name: Build PHP

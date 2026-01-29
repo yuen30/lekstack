@@ -112,6 +112,13 @@ pub fn generate_nginx_config(base_path: &PathBuf) -> PathBuf {
     let logs_dir = base_path.join("logs");
     let pids_dir = base_path.join("pids");
 
+    if !logs_dir.exists() {
+        let _ = fs::create_dir_all(&logs_dir);
+    }
+    if !pids_dir.exists() {
+        let _ = fs::create_dir_all(&pids_dir);
+    }
+
     // Use ~/LekStack/Web as the default root instead of ~/.lekstack/html
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
     let html_dir = PathBuf::from(home).join("LekStack/Web");
@@ -592,6 +599,33 @@ pub fn get_service_status(name: &str) -> String {
 #[tauri::command]
 pub fn get_service_port(name: String) -> u16 {
     get_service_port_value(&name)
+}
+
+#[tauri::command]
+pub fn check_port_usage(port: u16) -> bool {
+    std::net::TcpListener::bind(format!("0.0.0.0:{}", port)).is_err()
+}
+
+#[tauri::command]
+pub fn kill_process_on_port(port: u16) -> Result<String, String> {
+    // Try using lsof
+    let output = Command::new("lsof")
+        .arg("-t")
+        .arg(format!("-i:{}", port))
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let pids = String::from_utf8_lossy(&output.stdout);
+        for pid in pids.lines() {
+            if !pid.trim().is_empty() {
+                let _ = Command::new("kill").arg("-9").arg(pid).status();
+            }
+        }
+        Ok("Process killed".to_string())
+    } else {
+        Err("Could not find process on port or lsof missing".to_string())
+    }
 }
 
 #[tauri::command]

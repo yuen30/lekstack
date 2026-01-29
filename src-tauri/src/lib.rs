@@ -78,6 +78,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_install_path,
+            check_is_initialized,
             init_environment,
             get_service_status,
             get_all_services,
@@ -109,6 +110,8 @@ pub fn run() {
             change_db_password,
             get_service_port,
             update_service_port,
+            check_port_usage,
+            kill_process_on_port,
             get_service_logs
         ])
         .on_page_load(|window, _payload| {

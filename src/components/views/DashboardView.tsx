@@ -101,10 +101,28 @@ export default function DashboardView() {
       // 1. Check Service Statuses dynamically from Metadata Keys
       const serviceIds = Object.keys(SERVICE_MAP);
       const updatedServices = await Promise.all(
-        serviceIds.map(async (id) => {
-          const meta = SERVICE_MAP[id];
+        serviceIds.map(async (key) => {
+          let meta = SERVICE_MAP[key];
+          let id = key;
+          let runtimeName = id;
+
+          // Special handling for dynamic PHP version
+          if (key === 'php-8.2') {
+            try {
+              const activeVersions = await invoke<Record<string, string>>('get_active_versions');
+              const activePhp = activeVersions['php'];
+              if (activePhp) {
+                id = `php-${activePhp}`;
+                runtimeName = 'php';
+              }
+            } catch (e) {
+              console.error("Failed to get active php version in dashboard", e);
+            }
+          } else if (key.startsWith("php")) {
+            runtimeName = "php";
+          }
+
           try {
-            const runtimeName = id.startsWith('php') ? 'php' : id;
             const installed = await invoke<string[]>('list_installed_versions', {
               runtime: runtimeName,
             });
@@ -119,17 +137,16 @@ export default function DashboardView() {
             }
 
             const status = await invoke<string>('get_service_status', { name: id });
-            const activeVersion = await invoke<string>('get_active_version', {
-              runtime: runtimeName,
-            });
 
-            // For PHP cards that have specific version in ID (like php-8.2)
-            // if it's the active version, we show it. Otherwise we show the ID version.
-            let displayVersion = activeVersion || installed[0] || '';
-            if (id.startsWith('php-') && id !== `php-${activeVersion}`) {
-              // If this is a specific PHP card but not the active one,
-              // show its own version from ID
+            // Should display the version of the service ID
+            let displayVersion = "";
+            if (id.startsWith('php-')) {
               displayVersion = id.replace('php-', '');
+            } else {
+              const activeVersion = await invoke<string>('get_active_version', {
+                runtime: runtimeName,
+              });
+              displayVersion = activeVersion || installed[0] || '';
             }
 
             return {
@@ -185,6 +202,44 @@ export default function DashboardView() {
     const toastId = toast.loading(`${isStarting ? 'Starting' : 'Stopping'} ${service.name}...`);
 
     try {
+      // Port Conflict Check for specific services
+      if (isStarting && (serviceId === 'nginx' || serviceId.startsWith('php'))) {
+        let port = 0;
+        try {
+          port = await invoke<number>('get_service_port', { name: serviceId });
+        } catch {
+          port = serviceId === 'nginx' ? 8080 : 0;
+        }
+
+        if (port > 0) {
+          const isBusy = await invoke<boolean>('check_port_usage', { port });
+          if (isBusy) {
+            // Determine conflicting process?
+            // For now, simpler confirmation
+            const confirmed = window.confirm(
+              `Port ${port} is currently in use by another process.\n\nDo you want to force kill the process occupying this port to start ${service.name}?`
+            );
+
+            if (confirmed) {
+              try {
+                await invoke('kill_process_on_port', { port });
+                toast.info(`Freed port ${port}`, { id: toastId });
+              } catch (e) {
+                toast.error(`Failed to kill process on port ${port}: ${e}`, { id: toastId });
+                // Revert status
+                setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, status: 'stopped' } : s)));
+                return;
+              }
+            } else {
+              toast.dismiss(toastId);
+              toast.warning("Start cancelled: Port occupied");
+              setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, status: 'stopped' } : s)));
+              return;
+            }
+          }
+        }
+      }
+
       const command = service.status === 'running' ? 'stop_service' : 'start_service';
       await invoke(command, { name: serviceId });
 
@@ -202,12 +257,13 @@ export default function DashboardView() {
           if (s === targetStatus) {
             toast.success(`${service.name} ${isStarting ? 'Started' : 'Stopped'}`, { id: toastId });
           } else {
-            toast.error(`${service.name} timed out`, { id: toastId });
+            toast.error(`${service.name} timed out. Check logs.`, { id: toastId });
+            setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, status: 'error' } : s)));
           }
         }
       }, 500);
-    } catch {
-      toast.error(`Failed to handle ${serviceId}`, { id: toastId });
+    } catch (e) {
+      toast.error(`Failed to handle ${serviceId}: ${e}`, { id: toastId });
       setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, status: 'error' } : s)));
     }
   };

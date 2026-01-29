@@ -3,6 +3,8 @@ import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Sidebar from './components/Sidebar';
+import WelcomeView from './components/views/WelcomeView';
+import { useAppContext } from './context/AppContext';
 
 // Lazy load views
 const DashboardView = lazy(() => import('./components/views/DashboardView'));
@@ -13,6 +15,7 @@ const PhpSettingsView = lazy(() => import('./components/views/PhpSettingsView'))
 const DatabaseManagerView = lazy(() => import('./components/views/DatabaseManagerView'));
 
 function App() {
+  const { state } = useAppContext();
   const [activeView, setActiveView] = useState('dashboard');
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -29,6 +32,21 @@ function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDark]);
+
+  if (state.isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-[#111] text-gray-500">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-indigo-500" size={40} />
+          <p>Loading LekStack...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!state.isInitialized) {
+    return <WelcomeView />;
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#111] font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300">

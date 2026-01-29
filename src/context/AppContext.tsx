@@ -23,6 +23,7 @@ interface AppState {
   sites: Site[];
   activeVersions: Record<string, string>;
   isLoading: boolean;
+  isInitialized: boolean;
   error: string | null;
   lastUpdated: Date | null;
 }
@@ -33,18 +34,20 @@ type AppAction =
   | { type: 'LOADING_ERROR'; payload: string }
   | {
     type: 'INITIAL_LOAD';
-    payload: { services: Service[]; sites: Site[]; versions: Record<string, string> };
+    payload: { services: Service[]; sites: Site[]; versions: Record<string, string>; isInitialized: boolean };
   }
   | { type: 'UPDATE_SERVICES'; payload: Service[] }
   | { type: 'UPDATE_SITES'; payload: Site[] }
   | { type: 'UPDATE_VERSIONS'; payload: Record<string, string> }
+  | { type: 'SET_INITIALIZED'; payload: boolean }
   | { type: 'CLEAR_ERROR' };
 
 const initialState: AppState = {
   services: [],
   sites: [],
   activeVersions: {},
-  isLoading: false,
+  isLoading: true,
+  isInitialized: false,
   error: null,
   lastUpdated: null,
 };
@@ -63,6 +66,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         services: action.payload.services,
         sites: action.payload.sites,
         activeVersions: action.payload.versions,
+        isInitialized: action.payload.isInitialized,
         isLoading: false,
         lastUpdated: new Date(),
       };
@@ -72,6 +76,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, sites: action.payload };
     case 'UPDATE_VERSIONS':
       return { ...state, activeVersions: action.payload };
+    case 'SET_INITIALIZED':
+      return { ...state, isInitialized: action.payload };
     case 'CLEAR_ERROR':
       return { ...state, error: null };
     default:
@@ -83,20 +89,48 @@ interface AppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   refreshData: () => Promise<void>;
+  checkInit: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType>({
   state: initialState,
   dispatch: () => null,
   refreshData: async () => { },
+  checkInit: async () => { },
 });
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  const checkInit = async () => {
+    try {
+      const initialized = await invoke<boolean>('check_is_initialized');
+      if (!initialized) {
+        dispatch({
+          type: 'INITIAL_LOAD',
+          payload: { services: [], sites: [], versions: {}, isInitialized: false }
+        });
+        return;
+      }
+      await refreshData();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   const refreshData = async () => {
     dispatch({ type: 'LOADING_START' });
     try {
+      const initialized = await invoke<boolean>('check_is_initialized');
+
+      if (!initialized) {
+        dispatch({
+          type: 'INITIAL_LOAD',
+          payload: { services: [], sites: [], versions: {}, isInitialized: false },
+        });
+        return;
+      }
+
       const [services, sites, versions] = await Promise.all([
         invoke<Service[]>('get_all_services'),
         invoke<Site[]>('scan_sites'),
@@ -105,24 +139,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       dispatch({
         type: 'INITIAL_LOAD',
-        payload: { services, sites, versions },
+        payload: { services, sites, versions, isInitialized: true },
       });
     } catch (error) {
       dispatch({
         type: 'LOADING_ERROR',
         payload: error instanceof Error ? error.message : String(error),
       });
-      toast.error(`Failed to load data: ${error}`);
+      // toast.error(`Failed to load data: ${error}`);
     }
   };
 
   // Load initial data
   useEffect(() => {
-    refreshData();
+    checkInit();
   }, []);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, refreshData }}>{children}</AppContext.Provider>
+    <AppContext.Provider value={{ state, dispatch, refreshData, checkInit }}>{children}</AppContext.Provider>
   );
 };
 

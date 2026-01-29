@@ -32,11 +32,25 @@ pub fn get_install_path() -> Result<String> {
 }
 
 #[tauri::command]
+pub fn check_is_initialized() -> bool {
+    let base_path = get_default_path();
+    base_path.exists() &&
+    base_path.join("versions").exists() &&
+    base_path.join("config").exists() &&
+    base_path.join("logs").exists() &&
+    base_path.join("pids").exists()
+}
+
+#[tauri::command]
 pub fn init_environment() -> Result<String> {
     info!("Initializing LekStack environment");
     
     let base_path = get_default_path();
-    let dirs = vec!["bin", "config", "logs", "pids", "valet", "versions", "data"];
+    let dirs = vec![
+        "versions", "versions/php", "versions/nginx", "versions/mariadb", "versions/postgresql", "versions/redis",
+        "config", "config/sites", "config/certs", 
+        "logs", "pids", "valet", "data", "sockets"
+    ];
 
     for dir in dirs {
         let p = base_path.join(dir);
@@ -53,10 +67,47 @@ pub fn init_environment() -> Result<String> {
     if !projects_dir.exists() {
         fs::create_dir_all(&projects_dir)
             .map_err(|e| LekStackError::IoError(e))?;
-        fs::write(
-            projects_dir.join("index.php"),
-            "<?php echo '<h1>Welcome to LekStack</h1><p>This file is located at ~/LekStack/Web/index.php</p>'; phpinfo(); ?>",
-        ).map_err(|e| LekStackError::IoError(e))?;
+            
+        let index_content = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to LekStack</title>
+    <style>
+        :root { --bg: #f8fafc; --text: #334155; --card: #ffffff; --primary: #4f46e5; --secondary: #64748b; }
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #0f172a; --text: #e2e8f0; --card: #1e293b; --primary: #818cf8; --secondary: #94a3b8; }
+        }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; line-height: 1.6; }
+        .container { background: var(--card); padding: 3rem; border-radius: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 500px; width: 90%; text-align: center; }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem; font-weight: 800; letter-spacing: -0.05em; }
+        p { color: var(--secondary); margin-bottom: 2rem; }
+        .path { background: var(--bg); padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.9rem; margin-bottom: 2rem; word-break: break-all; border: 1px solid var(--secondary); opacity: 0.8; }
+        .btn { display: inline-block; background: var(--primary); color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: 600; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .footer { margin-top: 2rem; font-size: 0.875rem; color: var(--secondary); opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LekStack</h1>
+        <p>Your local PHP environment is running perfectly!</p>
+        <div class="path"><?php echo __FILE__; ?></div>
+        <a href="?info=true" class="btn">View PHP Info</a>
+        <div class="footer">Edit this file to start building your application.</div>
+    </div>
+    <?php if (isset($_GET['info'])): ?>
+        <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:white;color:black;overflow:auto;z-index:9999;padding:2rem;">
+            <a href="?" style="position:fixed;top:1rem;right:1rem;background:black;color:white;padding:0.5rem 1rem;text-decoration:none;border-radius:4px;">Close</a>
+            <?php phpinfo(); ?>
+        </div>
+    <?php endif; ?>
+</body>
+</html>"#;
+        
+        fs::write(projects_dir.join("index.php"), index_content)
+            .map_err(|e| LekStackError::IoError(e))?;
         info!("Created projects directory at {}", projects_dir.to_string_lossy());
     }
 

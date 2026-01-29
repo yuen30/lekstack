@@ -112,27 +112,85 @@ jobs:
       - name: Create CLI Archive
         run: |
           cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
-          # CLI binary only
-          tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz \
-            bin/php \
-            lib/php.ini-* \
-            include/ \
-            lib/php/
+          
+          # Create archive with conditional php.ini inclusion
+          if ls lib/php.ini-* 1> /dev/null 2>&1; then
+            echo "Found php.ini files, including in archive"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz \
+              bin/php \
+              lib/php.ini-* \
+              include/ \
+              lib/php/
+          else
+            echo "No php.ini files found, creating archive without them"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz \
+              bin/php \
+              include/ \
+              lib/php/
+          fi
+          
+          # Check if archive was created successfully
+          if [ -f "${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz" ]; then
+            echo "CLI Archive created successfully"
+            ls -lh ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz
+          else
+            echo "ERROR: CLI Archive creation failed"
+            exit 1
+          fi
 
       - name: Create FPM Archive
         run: |
           cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
-          # FPM binary and required files
-          tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz \
-            sbin/php-fpm \
-            etc/ \
-            var/
+          
+          # Create FPM archive with conditional config files
+          if [ -d "etc/" ] && [ -d "var/" ]; then
+            echo "Found config directories, including in archive"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz \
+              sbin/php-fpm \
+              etc/ \
+              var/
+          elif [ -f "sbin/php-fpm" ]; then
+            echo "Only php-fpm binary found, creating minimal archive"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz \
+              sbin/php-fpm
+          else
+            echo "ERROR: php-fpm binary not found"
+            exit 1
+          fi
+          
+          # Check if archive was created successfully
+          if [ -f "${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz" ]; then
+            echo "FPM Archive created successfully"
+            ls -lh ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz
+          else
+            echo "ERROR: FPM Archive creation failed"
+            exit 1
+          fi
 
       - name: Create Full Archive
         run: |
           cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
-          # Complete PHP installation
-          tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
+          
+          # Create full archive with all available components
+          if [ -d "etc/" ] && [ -d "var/" ]; then
+            echo "Creating full archive with config directories"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
+          elif [ -f "sbin/php-fpm" ]; then
+            echo "Creating full archive with available components"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
+          else
+            echo "Creating minimal full archive"
+            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
+          fi
+          
+          # Check if archive was created successfully
+          if [ -f "${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz" ]; then
+            echo "Full Archive created successfully"
+            ls -lh ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz
+          else
+            echo "ERROR: Full Archive creation failed"
+            exit 1
+          fi
 
       - name: Generate checksums
         run: |

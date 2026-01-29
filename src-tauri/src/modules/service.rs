@@ -21,7 +21,6 @@ pub struct Service {
 #[tauri::command]
 pub fn get_all_services() -> Vec<Service> {
     let mut services = Vec::new();
-    let base_path = get_default_path();
 
     // 1. Nginx
     let nginx_status = get_service_status("nginx");

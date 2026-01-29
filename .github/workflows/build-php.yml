@@ -46,12 +46,15 @@ jobs:
       - name: Download PHP Sources & Extensions
         run: |
           cd static-php-cli
-          ./bin/spc download --with-php=${{ inputs.php_version }} --for-extensions="bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,ftp,gd,gettext,gmp,iconv,intl,ldap,mbstring,mbregex,mysqli,mysqlnd,openssl,pcntl,pdo,pdo_mysql,pdo_pgsql,pdo_sqlite,phar,posix,readline,redis,session,shmop,simplexml,soap,sockets,sodium,sqlite3,sysvmsg,sysvsem,sysvshm,tidy,tokenizer,xml,xmlreader,xmlwriter,xsl,zip,zlib,opcache" --for-libs="gettext"
+          ./bin/spc download --with-php=${{ inputs.php_version }} --for-extensions="bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,ftp,gd,gettext,gmp,iconv,intl,ldap,mbstring,mbregex,mysqli,mysqlnd,openssl,pcntl,pdo,pdo_mysql,pdo_pgsql,pdo_sqlite,phar,posix,readline,redis,session,shmop,simplexml,soap,sockets,sodium,sqlite3,sysvmsg,sysvsem,sysvshm,tidy,tokenizer,xml,xmlreader,xmlwriter,xsl,zip,zlib,opcache"
 
-      - name: Build Static PHP
+      - name: Build Static PHP (Alpine Docker)
         run: |
           cd static-php-cli
-          ./bin/spc build --build-cli --build-fpm --debug "bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,ftp,gd,gettext,gmp,iconv,intl,ldap,mbstring,mbregex,mysqli,mysqlnd,openssl,pcntl,pdo,pdo_mysql,pdo_pgsql,pdo_sqlite,phar,posix,readline,redis,session,shmop,simplexml,soap,sockets,sodium,sqlite3,sysvmsg,sysvsem,sysvshm,tidy,tokenizer,xml,xmlreader,xmlwriter,xsl,zip,zlib,opcache"
+          # Use Alpine Docker for robust static linking (musl)
+          # Note: We need to make sure the script is executable
+          chmod +x bin/spc-alpine-docker
+          ./bin/spc-alpine-docker build --build-cli --build-fpm --debug "bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,ftp,gd,gettext,gmp,iconv,intl,ldap,mbstring,mbregex,mysqli,mysqlnd,openssl,pcntl,pdo,pdo_mysql,pdo_pgsql,pdo_sqlite,phar,posix,readline,redis,session,shmop,simplexml,soap,sockets,sodium,sqlite3,sysvmsg,sysvsem,sysvshm,tidy,tokenizer,xml,xmlreader,xmlwriter,xsl,zip,zlib,opcache"
 
       - name: Verify Build
         run: |

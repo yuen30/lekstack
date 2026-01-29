@@ -8,7 +8,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
 use tauri::{Emitter, Window};
-use log::{info, error, warn};
+use log::{info, warn};
 use std::collections::HashMap;
 
 #[tauri::command]

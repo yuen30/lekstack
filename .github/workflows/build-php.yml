@@ -1,4 +1,4 @@
-name: Build PHP Binaries with FPM
+name: Build Static PHP Binaries
 
 on:
   workflow_dispatch:
@@ -16,284 +16,122 @@ permissions:
   contents: write
 
 jobs:
-  build-php:
-    runs-on: ubuntu-22.04
-    
+  build-static-php:
+    name: Build Static PHP ${{ inputs.php_version }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            autoconf \
-            libtool \
-            bison \
-            re2c \
-            pkg-config \
-            libssl-dev \
-            libcurl4-openssl-dev \
-            libxml2-dev \
-            libsqlite3-dev \
-            libonig-dev \
-            libzip-dev \
-            libpng-dev \
-            libjpeg-dev \
-            libfreetype6-dev \
-            libwebp-dev \
-            libxpm-dev \
-            libbz2-dev \
-            libreadline-dev \
-            libgmp-dev \
-            libldap2-dev \
-            libsasl2-dev \
-            libpq-dev \
-            libsodium-dev \
-            libargon2-dev \
-            libxslt1-dev \
-            libxslt1-dev \
-            libffi-dev
+      - name: Setup PHP (for running SPC)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          tools: composer:v2
+          coverage: none
 
-      - name: Download PHP Source
-        run: |
-          wget https://www.php.net/distributions/php-${{ github.event.inputs.php_version }}.tar.gz
-          tar -xzf php-${{ github.event.inputs.php_version }}.tar.gz
+      - name: Checkout static-php-cli
+        uses: actions/checkout@v4
+        with:
+          repository: crazywhalecc/static-php-cli
+          path: static-php-cli
 
-      - name: Configure PHP
+      - name: Install SPC dependencies
         run: |
-          cd php-${{ github.event.inputs.php_version }}
-          ./configure \
-            --prefix=/opt/php-${{ github.event.inputs.php_version }} \
-            --enable-fpm \
-            --with-fpm-user=www-data \
-            --with-fpm-group=www-data \
-            --enable-cli \
-            --enable-mbstring \
-            --enable-mbregex \
-            --enable-opcache \
-            --enable-bcmath \
-            --enable-calendar \
-            --enable-exif \
-            --enable-ftp \
-            --enable-gd \
-            --enable-intl \
-            --enable-pcntl \
-            --enable-shmop \
-            --enable-soap \
-            --enable-sockets \
-            --enable-sysvmsg \
-            --enable-sysvsem \
-            --enable-sysvshm \
-            --with-openssl \
-            --with-curl \
-            --with-zlib \
-            --with-bz2 \
-            --with-zip \
-            --with-readline \
-            --with-mysqli \
-            --with-pdo-mysql \
-            --with-pdo-pgsql \
-            --with-pgsql \
-            --with-gmp \
-            --with-ldap \
-            --with-sodium \
-            --with-password-argon2 \
-            --with-jpeg \
-            --with-freetype \
-            --with-webp \
-            --with-xpm \
-            --with-xsl \
-            --with-gettext \
-            --enable-ffi \
-            --with-sqlite3 \
-            --with-pdo-sqlite \
-            --with-iconv
+          cd static-php-cli
+          composer update --no-dev --classmap-authoritative
+          chmod +x bin/spc
+          bin/spc doctor --auto-fix
 
-      - name: Build PHP
+      - name: Download PHP Sources & Extensions
         run: |
-          cd php-${{ github.event.inputs.php_version }}
-          make -j$(nproc)
+          cd static-php-cli
+          ./bin/spc download --with-php=${{ inputs.php_version }} --for-extensions="bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,ftp,gd,gettext,gmp,iconv,intl,ldap,mbstring,mbregex,mysqli,mysqlnd,openssl,pcntl,pdo,pdo_mysql,pdo_pgsql,pdo_sqlite,phar,posix,readline,redis,session,shmop,simplexml,soap,sockets,sodium,sqlite3,sysvmsg,sysvsem,sysvshm,tidy,tokenizer,xml,xmlreader,xmlwriter,xsl,zip,zlib,opcache"
 
-      - name: Install PHP to staging directory
+      - name: Build Static PHP
         run: |
-          cd php-${{ github.event.inputs.php_version }}
-          make install INSTALL_ROOT=${{ github.workspace }}/php-staging
+          cd static-php-cli
+          ./bin/spc build --build-cli --build-fpm --debug "bcmath,calendar,ctype,curl,dom,exif,fileinfo,filter,ftp,gd,gettext,gmp,iconv,intl,ldap,mbstring,mbregex,mysqli,mysqlnd,openssl,pcntl,pdo,pdo_mysql,pdo_pgsql,pdo_sqlite,phar,posix,readline,redis,session,shmop,simplexml,soap,sockets,sodium,sqlite3,sysvmsg,sysvsem,sysvshm,tidy,tokenizer,xml,xmlreader,xmlwriter,xsl,zip,zlib,opcache"
 
       - name: Verify Build
         run: |
           echo "Verifying CLI binary..."
-          ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}/bin/php -v
+          ./static-php-cli/buildroot/bin/php -v
+          ./static-php-cli/buildroot/bin/php -m
           
-          echo "Verifying loaded modules..."
-          ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}/bin/php -m
+          echo "Verifying FPM binary..."
+          ./static-php-cli/buildroot/bin/php-fpm -v
 
-
-      - name: Create CLI Archive
+      - name: Prepare Archives
         run: |
-          cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
+          # Structure for LekStack
+          mkdir -p dist/cli/bin
+          mkdir -p dist/fpm/sbin
+          mkdir -p dist/fpm/etc
           
-          # Create archive with conditional php.ini inclusion
-          if ls lib/php.ini-* 1> /dev/null 2>&1; then
-            echo "Found php.ini files, including in archive"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz \
-              bin/php \
-              lib/php.ini-* \
-              include/ \
-              lib/php/
-          else
-            echo "No php.ini files found, creating archive without them"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz \
-              bin/php \
-              include/ \
-              lib/php/
-          fi
+          # Copy binaries
+          cp static-php-cli/buildroot/bin/php dist/cli/bin/
+          cp static-php-cli/buildroot/bin/php-fpm dist/fpm/sbin/
           
-          # Check if archive was created successfully
-          if [ -f "${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz" ]; then
-            echo "CLI Archive created successfully"
-            ls -lh ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz
-          else
-            echo "ERROR: CLI Archive creation failed"
-            exit 1
-          fi
+          # Create Archives
+          echo "Creating CLI Archive..."
+          cd dist/cli
+          tar -czf ../../php-${{ inputs.php_version }}-cli-linux-x86_64.tar.gz .
+          cd ../..
+          
+          echo "Creating FPM Archive..."
+          cd dist/fpm
+          tar -czf ../../php-${{ inputs.php_version }}-fpm-linux-x86_64.tar.gz .
+          cd ../..
+          
+          echo "Creating Full Archive..."
+          mkdir -p dist/full/bin
+          mkdir -p dist/full/sbin
+          cp static-php-cli/buildroot/bin/php dist/full/bin/
+          cp static-php-cli/buildroot/bin/php-fpm dist/full/sbin/
+          cd dist/full
+          tar -czf ../../php-${{ inputs.php_version }}-full-linux-x86_64.tar.gz .
+          cd ../..
 
-      - name: Create FPM Archive
+      - name: Generate Checksums
         run: |
-          cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
-          
-          # Create FPM archive with conditional config files
-          if [ -d "etc/" ] && [ -d "var/" ]; then
-            echo "Found config directories, including in archive"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz \
-              sbin/php-fpm \
-              etc/ \
-              var/
-          elif [ -f "sbin/php-fpm" ]; then
-            echo "Only php-fpm binary found, creating minimal archive"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz \
-              sbin/php-fpm
-          else
-            echo "ERROR: php-fpm binary not found"
-            exit 1
-          fi
-          
-          # Check if archive was created successfully
-          if [ -f "${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz" ]; then
-            echo "FPM Archive created successfully"
-            ls -lh ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz
-          else
-            echo "ERROR: FPM Archive creation failed"
-            exit 1
-          fi
+          sha256sum php-${{ inputs.php_version }}-*.tar.gz > checksums-${{ inputs.php_version }}.txt
+          cat checksums-${{ inputs.php_version }}.txt
 
-      - name: Create Full Archive
-        run: |
-          cd ${{ github.workspace }}/php-staging/opt/php-${{ github.event.inputs.php_version }}
-          
-          # Create full archive with all available components
-          if [ -d "etc/" ] && [ -d "var/" ]; then
-            echo "Creating full archive with config directories"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
-          elif [ -f "sbin/php-fpm" ]; then
-            echo "Creating full archive with available components"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
-          else
-            echo "Creating minimal full archive"
-            tar -czf ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz .
-          fi
-          
-          # Check if archive was created successfully
-          if [ -f "${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz" ]; then
-            echo "Full Archive created successfully"
-            ls -lh ${{ github.workspace }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz
-          else
-            echo "ERROR: Full Archive creation failed"
-            exit 1
-          fi
-
-      - name: Generate checksums
-        run: |
-          cd ${{ github.workspace }}
-          sha256sum php-${{ github.event.inputs.php_version }}-*.tar.gz > checksums-${{ github.event.inputs.php_version }}.txt
-          cat checksums-${{ github.event.inputs.php_version }}.txt
-      
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: php-${{ github.event.inputs.php_version }}-binaries
-          path: php-${{ github.event.inputs.php_version }}-*.tar.gz
+          name: php-${{ inputs.php_version }}-static-binaries
+          path: |
+            php-${{ inputs.php_version }}-*.tar.gz
+            checksums-${{ inputs.php_version }}.txt
           retention-days: 90
-
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: php-${{ github.event.inputs.php_version }}
-          name: PHP ${{ github.event.inputs.php_version }} Binaries
+          tag_name: php-${{ inputs.php_version }}
+          name: PHP ${{ inputs.php_version }} (Static)
           body: |
-            ## PHP ${{ github.event.inputs.php_version }} - Linux x86_64 Binaries
+            ## PHP ${{ inputs.php_version }} - Static Linux Binaries
             
-            Built with the following features:
-            - ✅ PHP-FPM (FastCGI Process Manager)
-            - ✅ CLI (Command Line Interface)
-            - ✅ OpenSSL, cURL, Zlib
-            - ✅ MySQL/MariaDB (mysqli, PDO)
-            - ✅ PostgreSQL (pgsql, PDO)
-            - ✅ GD (JPEG, PNG, WebP, FreeType)
-            - ✅ mbstring, intl, opcache
-            - ✅ bcmath, gmp, sodium
-            - ✅ ZIP, BZ2, readline
-            - ✅ SOAP, sockets, FTP
+            🚀 **Truly Portable**: Runs on any Linux distro (Alpine, Ubuntu, Fedora, Arch) without dependencies.
             
-            ### Available Downloads:
+            Built with `static-php-cli` including:
+            - ✅ **Core**: FPM, CLI, Opcache
+            - ✅ **Database**: MySQL, PgSQL, SQLite, Redis
+            - ✅ **Laravel Ready**: BCMath, Intl, Tidy, Zip, GD, Sodium, LDAP, XML, etc.
             
-            - **`php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz`** - CLI binary only (~15MB)
-            - **`php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz`** - FPM binary and configs (~5MB)
-            - **`php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz`** - Complete installation (~50MB)
+            ### Downloads
             
-            ### Installation:
-            
-            ```bash
-            # Extract to ~/.lekstack/versions/php/${{ github.event.inputs.short_version }}/
-            wget https://github.com/${{ github.repository }}/releases/download/php-${{ github.event.inputs.php_version }}/php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz
-            mkdir -p ~/.lekstack/versions/php/${{ github.event.inputs.short_version }}
-            tar -xzf php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz -C ~/.lekstack/versions/php/${{ github.event.inputs.short_version }}/
-            ```
-            
-            ### Verify checksums:
-            
-            ```bash
-            sha256sum -c checksums-${{ github.event.inputs.php_version }}.txt
-            ```
+            - **CLI**: `php-${{ inputs.php_version }}-cli-linux-x86_64.tar.gz`
+            - **FPM**: `php-${{ inputs.php_version }}-fpm-linux-x86_64.tar.gz`
+            - **Full**: `php-${{ inputs.php_version }}-full-linux-x86_64.tar.gz`
             
             ---
-            
-            🤖 Built automatically with GitHub Actions
-            📅 Build date: ${{ github.event.repository.updated_at }}
-            🔧 Builder: ubuntu-22.04
+            Built automatically by LekStack CI
           files: |
-            php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz
-            php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz
-            php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz
-            checksums-${{ github.event.inputs.php_version }}.txt
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update build summary
-        run: |
-          echo "## ✅ PHP ${{ github.event.inputs.php_version }} Build Complete!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Artifacts Created:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`php-${{ github.event.inputs.php_version }}-cli-linux-x86_64.tar.gz\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`php-${{ github.event.inputs.php_version }}-fpm-linux-x86_64.tar.gz\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`php-${{ github.event.inputs.php_version }}-full-linux-x86_64.tar.gz\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 File Sizes:" >> $GITHUB_STEP_SUMMARY
-          ls -lh php-${{ github.event.inputs.php_version }}-*.tar.gz >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔐 Checksums:" >> $GITHUB_STEP_SUMMARY
-          cat checksums-${{ github.event.inputs.php_version }}.txt >> $GITHUB_STEP_SUMMARY
+            php-${{ inputs.php_version }}-cli-linux-x86_64.tar.gz
+            php-${{ inputs.php_version }}-fpm-linux-x86_64.tar.gz
+            php-${{ inputs.php_version }}-full-linux-x86_64.tar.gz
+            checksums-${{ inputs.php_version }}.txt

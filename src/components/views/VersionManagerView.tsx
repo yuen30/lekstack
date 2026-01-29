@@ -6,6 +6,8 @@ import bunLogo from '../../assets/bun-logo.svg';
 import phpLogo from '../../assets/php-logo.svg';
 import nodeLogo from '../../assets/node-logo.svg';
 import PhpIniEditor from '../PhpIniEditor';
+import NodeConfigEditor from '../NodeConfigEditor';
+import BunConfigEditor from '../BunConfigEditor';
 
 interface Version {
   version: string;
@@ -84,6 +86,10 @@ export default function VersionManagerView() {
   const [nginxVersions, setNginxVersions] = useState(NGINX_VERSIONS);
   const [showPhpIniEditor, setShowPhpIniEditor] = useState(false);
   const [editingPhpVersion, setEditingPhpVersion] = useState<string>('');
+  const [showNodeConfigEditor, setShowNodeConfigEditor] = useState(false);
+  const [editingNodeVersion, setEditingNodeVersion] = useState<string>('');
+  const [showBunConfigEditor, setShowBunConfigEditor] = useState(false);
+  const [editingBunVersion, setEditingBunVersion] = useState<string>('');
 
   // Fetch installed versions and active version from backend
   useEffect(() => {
@@ -227,6 +233,16 @@ export default function VersionManagerView() {
   const openPhpIniEditor = (version: string) => {
     setEditingPhpVersion(version);
     setShowPhpIniEditor(true);
+  };
+
+  const openNodeConfigEditor = (version: string) => {
+    setEditingNodeVersion(version);
+    setShowNodeConfigEditor(true);
+  };
+
+  const openBunConfigEditor = (version: string) => {
+    setEditingBunVersion(version);
+    setShowBunConfigEditor(true);
   };
 
   const currentList =
@@ -404,6 +420,24 @@ export default function VersionManagerView() {
                           <Settings size={16} />
                         </button>
                       )}
+                      {activeTab === 'node' && (
+                        <button
+                          onClick={() => openNodeConfigEditor(ver.version)}
+                          className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title={`Edit package.json for Node.js ${ver.version}`}
+                        >
+                          <Settings size={16} />
+                        </button>
+                      )}
+                      {activeTab === 'bun' && (
+                        <button
+                          onClick={() => openBunConfigEditor(ver.version)}
+                          className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title={`Edit bunfig.toml for Bun ${ver.version}`}
+                        >
+                          <Settings size={16} />
+                        </button>
+                      )}
                       {ver.status !== 'active' && (
                         <button
                           onClick={() => uninstallVersion(ver.version, activeTab)}
@@ -432,6 +466,16 @@ export default function VersionManagerView() {
         version={editingPhpVersion}
         isOpen={showPhpIniEditor}
         onClose={() => setShowPhpIniEditor(false)}
+      />
+      <NodeConfigEditor
+        version={editingNodeVersion}
+        isOpen={showNodeConfigEditor}
+        onClose={() => setShowNodeConfigEditor(false)}
+      />
+      <BunConfigEditor
+        version={editingBunVersion}
+        isOpen={showBunConfigEditor}
+        onClose={() => setShowBunConfigEditor(false)}
       />
     </div>
   );

@@ -42,6 +42,14 @@ const SERVICE_MAP: Record<string, { name: string; description: string }> = {
     name: 'PHP-FPM',
     description: 'PHP FastCGI backend for processing .php files.',
   },
+  node: {
+    name: 'Node.js',
+    description: 'JavaScript runtime for building scalable network applications.',
+  },
+  bun: {
+    name: 'Bun',
+    description: 'Fast all-in-one JavaScript runtime.',
+  },
   mariadb: {
     name: 'MariaDB',
     description: 'Open source relational database (MySQL compatible).',
@@ -242,6 +250,16 @@ export default function DashboardView() {
         console.error('Failed to open browser:', e);
         await openUrl('http://localhost:8080');
       }
+    } else if (serviceId === 'node' || serviceId === 'bun') {
+      try {
+        const port = await invoke<number>('get_service_port', { name: serviceId });
+        const url = `http://localhost:${port || (serviceId === 'node' ? 3000 : 3001)}`;
+        await openUrl(url);
+      } catch (e) {
+        console.error('Failed to open browser:', e);
+        const defaultPort = serviceId === 'node' ? 3000 : 3001;
+        await openUrl(`http://localhost:${defaultPort}`);
+      }
     }
   };
 
@@ -372,12 +390,26 @@ export default function DashboardView() {
                 }
                 onToggle={() => toggleService(service.id)}
                 onViewLogs={() => openLogs(service)}
-                onOpen={service.id === 'nginx' ? () => openBrowser(service.id) : undefined}
+                onOpen={
+                  service.id === 'nginx' 
+                    ? () => openBrowser(service.id) 
+                    : service.id === 'node' || service.id === 'bun'
+                      ? () => openBrowser(service.id)
+                      : undefined
+                }
                 icon={
                   service.id === 'nginx' ? (
                     <Globe size={24} />
                   ) : service.id.startsWith('php') ? (
                     <Zap size={24} />
+                  ) : service.id === 'node' ? (
+                    <div className="w-6 h-6 rounded bg-green-500 flex items-center justify-center text-white text-xs font-bold">
+                      JS
+                    </div>
+                  ) : service.id === 'bun' ? (
+                    <div className="w-6 h-6 rounded bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
+                      B
+                    </div>
                   ) : (
                     <Database size={24} />
                   )

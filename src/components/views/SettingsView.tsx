@@ -14,6 +14,8 @@ export default function SettingsView() {
   const [phpPort82, setPhpPort82] = useState(9082);
   const [phpPort83, setPhpPort83] = useState(9083);
   const [phpPort84, setPhpPort84] = useState(9084);
+  const [nodePort, setNodePort] = useState(3000);
+  const [bunPort, setBunPort] = useState(3001);
 
   useEffect(() => {
     // Fetch current path from backend
@@ -30,7 +32,9 @@ export default function SettingsView() {
       invoke<number>('get_service_port', { name: 'php-8.2' }),
       invoke<number>('get_service_port', { name: 'php-8.3' }),
       invoke<number>('get_service_port', { name: 'php-8.4' }),
-    ]).then(([nginx, mariadb, postgresql, redis, php82, php83, php84]) => {
+      invoke<number>('get_service_port', { name: 'node' }),
+      invoke<number>('get_service_port', { name: 'bun' }),
+    ]).then(([nginx, mariadb, postgresql, redis, php82, php83, php84, node, bun]) => {
       setNginxPort(nginx);
       setMariadbPort(mariadb);
       setPostgresqlPort(postgresql);
@@ -38,6 +42,8 @@ export default function SettingsView() {
       setPhpPort82(php82);
       setPhpPort83(php83);
       setPhpPort84(php84);
+      setNodePort(node);
+      setBunPort(bun);
     }).catch((err) => console.error('Failed to get ports:', err));
   }, []);
 
@@ -307,6 +313,50 @@ export default function SettingsView() {
               />
               <button
                 onClick={() => updatePort('php-8.4', phpPort84)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          {/* Node.js Port */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">Node.js</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Development server port</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={nodePort}
+                onChange={(e) => setNodePort(Number(e.target.value))}
+                className="w-24 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#202020] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm text-center"
+              />
+              <button
+                onClick={() => updatePort('node', nodePort)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          {/* Bun Port */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">Bun</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Development server port</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={bunPort}
+                onChange={(e) => setBunPort(Number(e.target.value))}
+                className="w-24 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#202020] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm text-center"
+              />
+              <button
+                onClick={() => updatePort('bun', bunPort)}
                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
               >
                 Save

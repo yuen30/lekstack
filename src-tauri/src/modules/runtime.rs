@@ -92,7 +92,7 @@ pub async fn install_runtime(
             (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/bun-v1.0.0-linux-x64.zip"), "archive.zip")
         ],
         "php" => {
-            // Use GitHub Actions pre-built binaries with real PHP-FPM
+            // Temporary workaround: Use static-php.dev while GitHub release download issues are resolved
             // Build these using: .github/workflows/build-php.yml
             // Updated: January 2026 - Latest patch versions
             let (download_version, short_ver) = match version.as_str() {
@@ -103,19 +103,11 @@ pub async fn install_runtime(
                 _ => ("8.3.30", "8.3"),      // Default to 8.3 (most stable)
             };
             
-            // For PHP 8.5, use static-php-cli as fallback until GitHub Actions build is available
-            if version == "8.5" {
-                vec![
-                    (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
-                    (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-micro-linux-x86_64.tar.gz", download_version), "php-micro.tar.gz")
-                ]
-            } else {
-                // Download CLI and FPM separately for better efficiency
-                vec![
-                    (format!("https://github.com/taweechai/LekStack/releases/download/php-{}/php-{}-cli-linux-x86_64.tar.gz", download_version, download_version), "php-cli.tar.gz"),
-                    (format!("https://github.com/taweechai/LekStack/releases/download/php-{}/php-{}-fpm-linux-x86_64.tar.gz", download_version, download_version), "php-fpm.tar.gz")
-                ]
-            }
+            // Use static-php.dev as fallback (works reliably)
+            vec![
+                (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
+                (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-micro-linux-x86_64.tar.gz", download_version), "php-micro.tar.gz")
+            ]
         },
         "nginx" => {
             let (download_url, archive_name) = match version.as_str() {

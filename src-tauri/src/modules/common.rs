@@ -77,6 +77,8 @@ pub fn get_service_port_value(name: &str) -> u16 {
         "mariadb" => 3306,
         "postgresql" => 5432,
         "redis" => 6379,
+        "node" => 3000,
+        "bun" => 3001,
         "php-7.4" => 9074,
         "php-8.0" => 9080,
         "php-8.1" => 9081,

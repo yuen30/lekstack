@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Play, Square, Loader2, AlertCircle, CheckCircle2, FileText, ExternalLink } from 'lucide-react';
 
 interface ServiceCardProps {
   name: string;
@@ -8,6 +8,8 @@ interface ServiceCardProps {
   description: string;
   icon: React.ReactNode;
   onToggle: () => void;
+  onViewLogs?: () => void;
+  onOpen?: () => void;
 }
 
 const ServiceCard: React.FC<ServiceCardProps> = ({
@@ -17,6 +19,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   description,
   icon,
   onToggle,
+  onViewLogs,
+  onOpen,
 }) => {
   const isRunning = status === 'running';
   const isError = status === 'error';
@@ -125,6 +129,28 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                 Stopped
               </span>
             </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {onOpen && isRunning && (
+            <button
+              onClick={onOpen}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+            >
+              <ExternalLink size={14} />
+              Open
+            </button>
+          )}
+          
+          {onViewLogs && (
+            <button
+              onClick={onViewLogs}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+            >
+              <FileText size={14} />
+              Logs
+            </button>
           )}
         </div>
       </div>

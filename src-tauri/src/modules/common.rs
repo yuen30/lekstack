@@ -73,6 +73,7 @@ pub fn get_service_port_value(name: &str) -> u16 {
 
     // Default ports
     let default_port = match name {
+        "nginx" => 8080,
         "mariadb" => 3306,
         "postgresql" => 5432,
         "redis" => 6379,

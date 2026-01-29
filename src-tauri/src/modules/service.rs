@@ -144,6 +144,9 @@ fastcgi_param  SERVER_PORT        $server_port;
         let _ = fs::create_dir_all(&sites_dir);
     }
 
+    // Fetch dynamic port from service settings with 8080 as fallback
+    let nginx_port = get_service_port_value("nginx");
+    
     let conf_path = config_dir.join("nginx.conf");
     let conf_content = format!(
         r#"
@@ -165,7 +168,7 @@ http {{
     include       {}/sites/*.conf;
 
     server {{
-        listen       8080 default_server;
+        listen       {} default_server;
         server_name  _;
         root         {};
         index        index.html index.htm index.php;
@@ -187,6 +190,7 @@ http {{
         pids_dir.to_string_lossy(),
         logs_dir.to_string_lossy(),
         config_dir.to_string_lossy(),
+        nginx_port,
         html_dir.to_string_lossy()
     );
 
@@ -287,7 +291,42 @@ pub fn start_service(name: String) -> bool {
     let base_path = get_default_path();
 
     if name.contains("nginx") {
-        let nginx_bin = base_path.join("versions/nginx/1.24.0/nginx");
+        let versions_dir = base_path.join("versions/nginx");
+        
+        // Try to read active/default version from config first
+        let config_path = base_path.join("config/active_versions.json");
+        let mut nginx_bin = PathBuf::new();
+        
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(nginx_ver) = json.get("nginx").and_then(|v| v.as_str()) {
+                        nginx_bin = versions_dir.join(format!("{}/nginx", nginx_ver));
+                    }
+                }
+            }
+        }
+        
+        // Fallback to default or any installed version
+        if !nginx_bin.exists() {
+            nginx_bin = versions_dir.join("1.27.2/nginx");
+        }
+        
+        // If still not found, try to find any installed version
+        if !nginx_bin.exists() {
+            if let Ok(entries) = fs::read_dir(&versions_dir) {
+                for entry in entries.flatten() {
+                    if entry.path().is_dir() {
+                        let bin = entry.path().join("nginx");
+                        if bin.exists() {
+                            nginx_bin = bin;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         if !nginx_bin.exists() {
             return false;
         }
@@ -494,4 +533,32 @@ pub fn restart_all_services_logic() -> Result<String, String> {
 #[tauri::command]
 pub fn restart_all_services() -> Result<String, String> {
     restart_all_services_logic()
+}
+
+#[tauri::command]
+pub fn get_service_logs(name: String, lines: u32) -> Result<String, String> {
+    let base_path = get_default_path();
+    let log_path = if name == "nginx-error" {
+        base_path.join("logs/nginx-error.log")
+    } else if name == "nginx-access" {
+        base_path.join("logs/nginx-access.log")
+    } else if name.starts_with("php") {
+        let version = name.replace("php", "");
+        base_path.join(format!("logs/php{}-fpm.log", version))
+    } else {
+        base_path.join(format!("logs/{}.log", name))
+    };
+
+    if !log_path.exists() {
+        return Ok(format!("Log file not found at: {}", log_path.display()));
+    }
+
+    let output = Command::new("tail")
+        .arg("-n")
+        .arg(lines.to_string())
+        .arg(&log_path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }

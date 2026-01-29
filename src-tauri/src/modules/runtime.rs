@@ -70,10 +70,10 @@ pub async fn install_runtime(
 
     let downloads = match runtime.as_str() {
         "node" => vec![
-            (format!("https://nodejs.org/dist/v{}/node-v{}-linux-x64.tar.xz", version, version), "archive.tar.xz")
+            (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/node-v20.11.0-linux-x64.tar.xz"), "archive.tar.xz")
         ],
         "bun" => vec![
-            (format!("https://github.com/oven-sh/bun/releases/download/bun-v{}/bun-linux-x64.zip", version), "archive.zip")
+            (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/bun-v1.0.0-linux-x64.zip"), "archive.zip")
         ],
         "php" => {
             let download_version = match version.as_str() {
@@ -81,24 +81,31 @@ pub async fn install_runtime(
                 "8.3" => "8.3.30",
                 "8.4" => "8.4.17",
                 "8.5" => "8.5.2",
-                _ => version.as_str(),
+                _ => "8.2.30",
             };
             vec![
-                (format!("https://dl.static-php.dev/static-php-cli/bulk/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
-                (format!("https://dl.static-php.dev/static-php-cli/bulk/php-{}-fpm-linux-x86_64.tar.gz", download_version), "php-fpm.tar.gz")
+                (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
+                (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/php-{}-fpm-linux-x86_64.tar.gz", download_version), "php-fpm.tar.gz")
             ]
         },
-        "nginx" => vec![
-            (format!("https://github.com/jirutka/nginx-binaries/releases/download/{}/nginx-{}-x86_64-linux.tar.gz", version, version), "archive.tar.gz")
-        ],
+        "nginx" => {
+            let (download_url, archive_name) = match version.as_str() {
+                "1.27.2" => ("https://github.com/godmaycrying/nginx_binaries_for_linux/releases/download/1.27.2/nginx-1.27.2-binary.tar.gz".to_string(), "archive.tar.gz"),
+                "1.27.1" => ("https://github.com/godmaycrying/nginx_binaries_for_linux/releases/download/1.27.1/1.27.1.tar.gz".to_string(), "archive.tar.gz"),
+                "1.26.2" => ("https://github.com/godmaycrying/nginx_binaries_for_linux/releases/download/1.26.2/1.26.2.tar.gz".to_string(), "archive.tar.gz"),
+                "1.26.1" => ("https://github.com/godmaycrying/nginx_binaries_for_linux/releases/download/1.26.1/nginx-1.26.1.tar.gz".to_string(), "archive.tar.gz"),
+                _ => ("https://github.com/godmaycrying/nginx_binaries_for_linux/releases/download/1.27.2/nginx-1.27.2-binary.tar.gz".to_string(), "archive.tar.gz"),
+            };
+            vec![(download_url, archive_name)]
+        },
         "mariadb" => vec![
-            ("https://archive.mariadb.org/mariadb-11.4.4/bintar-linux-systemd-x86_64/mariadb-11.4.4-linux-systemd-x86_64.tar.gz".to_string(), "mariadb.tar.gz")
+            ("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/mariadb-11.4.4-linux-systemd-x86_64.tar.gz".to_string(), "mariadb.tar.gz")
         ],
         "postgresql" => vec![
-            ("https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/17.3.0/embedded-postgres-binaries-linux-amd64-17.3.0.jar".to_string(), "postgres.jar")
+            ("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/postgresql-16.2-linux-amd64.jar".to_string(), "postgres.jar")
         ],
         "redis" => vec![
-            ("https://repo1.maven.org/maven2/com/github/lansheng228/embedded-redis/7.4.1/embedded-redis-7.4.1.jar".to_string(), "redis.jar")
+            ("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/redis-7.4.1-linux-amd64.jar".to_string(), "redis.jar")
         ],
         _ => return Err("Unsupported runtime".to_string()),
     };
@@ -232,6 +239,36 @@ pub async fn install_runtime(
             return Err("Extraction failed".to_string());
         }
         let _ = fs::remove_file(archive_path);
+
+        // Post-extraction fix for Nginx
+        if runtime == "nginx" {
+            // The archive from godmaycrying has structure: ./<version>/amd64/nginx
+            // We want to move it to the root of version_path
+            let mut found_bin = None;
+            if let Ok(entries) = fs::read_dir(&version_path) {
+                for entry in entries.flatten() {
+                    if entry.path().is_dir() {
+                        let amd64_path = entry.path().join("amd64/nginx");
+                        if amd64_path.exists() {
+                            found_bin = Some(amd64_path);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if let Some(bin_path) = found_bin {
+                let target_bin = version_path.join("nginx");
+                let _ = fs::rename(bin_path, &target_bin);
+                
+                // Set executable permission
+                if let Ok(metadata) = fs::metadata(&target_bin) {
+                    let mut perms = metadata.permissions();
+                    perms.set_mode(0o755);
+                    let _ = fs::set_permissions(&target_bin, perms);
+                }
+            }
+        }
     }
 
     if runtime == "php" {
@@ -309,7 +346,30 @@ pub async fn update_global_shims(runtime: String, version: String) -> Result<Str
         }
         _ => {}
     }
-    Ok("Global shims updated".to_string())
+
+    // Always save active version to config for UI consistency
+    let config_path = base_path.join("config/active_versions.json");
+    let mut active_versions_val = if config_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_path) {
+            serde_json::from_str::<serde_json::Value>(&content).unwrap_or(serde_json::json!({}))
+        } else {
+            serde_json::json!({})
+        }
+    } else {
+        serde_json::json!({})
+    };
+
+    if let Some(obj) = active_versions_val.as_object_mut() {
+        obj.insert(runtime.clone(), serde_json::json!(version));
+    }
+
+    let _ = fs::create_dir_all(config_path.parent().unwrap());
+    let _ = fs::write(
+        &config_path,
+        serde_json::to_string_pretty(&active_versions_val).unwrap(),
+    );
+
+    Ok("Global version updated".to_string())
 }
 
 async fn ensure_composer(base_path: &PathBuf) -> Result<(), String> {
@@ -347,4 +407,49 @@ exec "{}" "{}" "$@"
     perms.set_mode(0o755);
     fs::set_permissions(&composer_wrapper, perms).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn uninstall_runtime(runtime: String, version: String) -> Result<String, String> {
+    let base_path = get_default_path();
+    let version_path = base_path.join("versions").join(&runtime).join(&version);
+
+    if !version_path.exists() {
+        return Err(format!("Version {} v{} is not installed.", runtime, version));
+    }
+
+    fs::remove_dir_all(&version_path).map_err(|e| format!("Failed to delete directory: {}", e))?;
+
+    Ok(format!("{} v{} uninstalled successfully.", runtime, version))
+}
+
+#[tauri::command]
+pub fn get_active_version(runtime: String) -> String {
+    let base_path = get_default_path();
+    let config_path = base_path.join("config/active_versions.json");
+    
+    if config_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(ver) = json.get(&runtime).and_then(|v| v.as_str()) {
+                    return ver.to_string();
+                }
+            }
+        }
+    }
+    
+    // For PHP, try to detect from binary shim if not in config
+    if runtime == "php" {
+        let php_bin = base_path.join("bin/php");
+        if php_bin.exists() {
+            if let Ok(target) = fs::read_link(&php_bin) {
+                // path looks like .../versions/php/8.2/bin/php
+                if let Some(ver) = target.parent().and_then(|p| p.parent()).and_then(|p| p.file_name()) {
+                    return ver.to_string_lossy().to_string();
+                }
+            }
+        }
+    }
+
+    "".to_string()
 }

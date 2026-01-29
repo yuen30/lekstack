@@ -8,7 +8,7 @@ import nodeLogo from '../../assets/node-logo.svg';
 
 interface Version {
   version: string;
-  status: 'installed' | 'not_installed' | 'installing' | 'active';
+  status: 'installed' | 'not_installed' | 'installing' | 'deleting' | 'active';
   releaseDate?: string;
   tags?: string[];
 }
@@ -33,10 +33,28 @@ const BUN_VERSIONS: Version[] = [
 
 const NGINX_VERSIONS: Version[] = [
   {
-    version: '1.24.0',
+    version: '1.27.2',
     status: 'not_installed',
-    releaseDate: 'Apr 2023',
-    tags: ['Stable', 'Static'],
+    releaseDate: 'Oct 2024',
+    tags: ['Mainline', 'Static'],
+  },
+  {
+    version: '1.27.1',
+    status: 'not_installed',
+    releaseDate: 'Sep 2024',
+    tags: ['Mainline'],
+  },
+  {
+    version: '1.26.2',
+    status: 'not_installed',
+    releaseDate: 'Aug 2024',
+    tags: ['Stable'],
+  },
+  {
+    version: '1.26.1',
+    status: 'not_installed',
+    releaseDate: 'Jun 2024',
+    tags: ['Stable'],
   },
 ];
 
@@ -64,19 +82,26 @@ export default function VersionManagerView() {
   const [bunVersions, setBunVersions] = useState(BUN_VERSIONS);
   const [nginxVersions, setNginxVersions] = useState(NGINX_VERSIONS);
 
-  // Fetch installed versions from backend
+  // Fetch installed versions and active version from backend
   useEffect(() => {
     const fetchInstalled = async () => {
       try {
-        const installed = await invoke<string[]>('list_installed_versions', { runtime: activeTab });
+        const [installed, activeVersion] = await Promise.all([
+          invoke<string[]>('list_installed_versions', { runtime: activeTab }),
+          invoke<string>('get_active_version', { runtime: activeTab }),
+        ]);
+        
         console.log(`Installed ${activeTab} versions:`, installed);
+        console.log(`Active ${activeTab} version:`, activeVersion);
 
         const updateStatus = (catalog: Version[]) => {
           return catalog.map((v) => ({
             ...v,
-            status: installed.includes(v.version)
-              ? ('installed' as const)
-              : ('not_installed' as const),
+            status: v.version === activeVersion 
+              ? ('active' as const)
+              : installed.includes(v.version)
+                ? ('installed' as const)
+                : ('not_installed' as const),
           }));
         };
 
@@ -137,9 +162,58 @@ export default function VersionManagerView() {
     }
   };
 
+  const uninstallVersion = async (version: string, type: 'php' | 'node' | 'bun' | 'nginx') => {
+    const setter =
+      type === 'php'
+        ? setPhpVersions
+        : type === 'node'
+          ? setNodeVersions
+          : type === 'bun'
+            ? setBunVersions
+            : setNginxVersions;
+
+    // Set UI to deleting state immediately for instant feedback
+    setter((prev) => prev.map((v) => (v.version === version ? { ...v, status: 'deleting' } : v)));
+
+    const tid = toast.loading(`Uninstalling ${type.toUpperCase()} ${version}...`);
+    try {
+      await invoke('uninstall_runtime', { runtime: type, version });
+      
+      // Re-fetch installed list to confirm deletion
+      const installed = await invoke<string[]>('list_installed_versions', { runtime: type });
+      setter((prev) =>
+        prev.map((v) =>
+          v.version === version
+            ? { ...v, status: installed.includes(version) ? 'installed' : 'not_installed' }
+            : v
+        )
+      );
+      toast.success(`${type.toUpperCase()} ${version} uninstalled`, { id: tid });
+    } catch (error) {
+      // Reset status back to installed if uninstall fails
+      setter((prev) => prev.map((v) => (v.version === version ? { ...v, status: 'installed' } : v)));
+      toast.error(`Failed to uninstall: ${error}`, { id: tid });
+    }
+  };
+
   const setGlobalVersion = async (version: string, type: 'php' | 'node' | 'bun' | 'nginx') => {
     try {
       await invoke('update_global_shims', { runtime: type, version });
+      
+      // Update local state to reflect new active version
+      const updateList = (prev: Version[]) => 
+        prev.map(v => ({
+          ...v,
+          status: v.version === version 
+            ? ('active' as const) 
+            : v.status === 'active' ? ('installed' as const) : v.status
+        }));
+
+      if (type === 'php') setPhpVersions(updateList);
+      if (type === 'node') setNodeVersions(updateList);
+      if (type === 'bun') setBunVersions(updateList);
+      if (type === 'nginx') setNginxVersions(updateList);
+
       toast.success(`Global ${type.toUpperCase()} version set to ${version}`);
     } catch (error) {
       console.error('Failed to set global version:', error);
@@ -181,7 +255,7 @@ export default function VersionManagerView() {
         <div className="flex gap-1">
           <button
             onClick={() => setActiveTab('php')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'php'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'php'
                 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
@@ -190,7 +264,7 @@ export default function VersionManagerView() {
           </button>
           <button
             onClick={() => setActiveTab('node')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'node'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'node'
                 ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
@@ -199,7 +273,7 @@ export default function VersionManagerView() {
           </button>
           <button
             onClick={() => setActiveTab('bun')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'bun'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'bun'
                 ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
@@ -208,7 +282,7 @@ export default function VersionManagerView() {
           </button>
           <button
             onClick={() => setActiveTab('nginx')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'nginx'
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'nginx'
                 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
@@ -241,7 +315,7 @@ export default function VersionManagerView() {
             {currentList.map((ver) => (
               <tr
                 key={ver.version}
-                className="hover:bg-gray-50/50 dark:hover:bg-[#202020]/30 transition-colors group"
+                className="hover:bg-gray-50/50 dark:hover:bg-[#202020]/30 transition-colors group cursor-pointer"
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -292,33 +366,40 @@ export default function VersionManagerView() {
                     <span className="inline-flex items-center gap-2 text-blue-500 bg-blue-50 dark:bg-blue-900/10 px-3 py-1.5 rounded-lg text-xs font-medium">
                       <RefreshCw size={12} className="animate-spin" /> Installing...
                     </span>
+                  ) : ver.status === 'deleting' ? (
+                    <span className="inline-flex items-center gap-2 text-red-500 bg-red-50 dark:bg-red-900/10 px-3 py-1.5 rounded-lg text-xs font-medium">
+                      <RefreshCw size={12} className="animate-spin" /> Deleting...
+                    </span>
                   ) : ver.status === 'not_installed' ? (
                     <button
                       onClick={() => installVersion(ver.version, activeTab)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium text-xs hover:opacity-90 transition-all opacity-0 group-hover:opacity-100"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 font-medium text-xs hover:opacity-90 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                      title={`Install ${activeTab.toUpperCase()} v${ver.version}`}
                     >
                       <Download size={14} /> Install
                     </button>
                   ) : (
                     <div className="flex items-center justify-end gap-2">
-                      {activeTab !== 'nginx' && (
-                        <button
-                          onClick={() => setGlobalVersion(ver.version, activeTab)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                          title="Set as Global Default"
-                        >
-                          <Globe size={16} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setGlobalVersion(ver.version, activeTab)}
+                        className="p-1.5 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                        title={`Set ${activeTab.toUpperCase()} v${ver.version} as Global Default`}
+                      >
+                        <Globe size={16} />
+                      </button>
                       {ver.status !== 'active' && (
                         <button
-                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                          title="Uninstall"
+                          onClick={() => uninstallVersion(ver.version, activeTab)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title={`Uninstall ${activeTab.toUpperCase()} v${ver.version}`}
                         >
                           <Trash2 size={16} />
                         </button>
                       )}
-                      <button className="px-3 py-1.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-gray-400 rounded-lg cursor-not-allowed">
+                      <button 
+                        className="px-3 py-1.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-gray-400 rounded-lg cursor-default"
+                        title={`${activeTab.toUpperCase()} v${ver.version} is installed`}
+                      >
                         Installed
                       </button>
                     </div>

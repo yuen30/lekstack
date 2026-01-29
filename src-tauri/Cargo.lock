@@ -1890,6 +1890,7 @@ name = "lekstack"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "libappindicator",
  "reqwest",
  "serde",
  "serde_json",

@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,13 +14,33 @@ const DatabaseManagerView = lazy(() => import('./components/views/DatabaseManage
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard');
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDark]);
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-[#111] font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      <Sidebar activeView={activeView} onNavigate={setActiveView} />
+    <div className="flex h-screen bg-gray-50 dark:bg-[#111] font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300">
+      <Sidebar 
+        activeView={activeView} 
+        onNavigate={setActiveView} 
+        isDark={isDark}
+        onToggleTheme={() => setIsDark(!isDark)}
+      />
 
       <main className="flex-1 overflow-auto relative">
-        <Toaster position="bottom-right" theme="system" />
+        <Toaster position="bottom-right" theme={isDark ? 'dark' : 'light'} />
         <Suspense
           fallback={
             <div className="h-full w-full flex items-center justify-center">

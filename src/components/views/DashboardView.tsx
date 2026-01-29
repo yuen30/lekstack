@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { motion } from 'motion/react';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Server,
   Database,
@@ -8,6 +9,8 @@ import {
   Zap,
   RotateCcw,
   LayoutGrid,
+  X,
+  Terminal,
 } from 'lucide-react';
 import ServiceCard from '../ServiceCard';
 import { toast } from 'sonner';
@@ -59,6 +62,40 @@ export default function DashboardView() {
   const [siteCount, setSiteCount] = useState(0);
   const [dbCount, setDbCount] = useState(0);
   const [isRestartingAll, setIsRestartingAll] = useState(false);
+  
+  // Log Viewer State
+  const [showLogs, setShowLogs] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [logs, setLogs] = useState('');
+  const [logLoading, setLogLoading] = useState(false);
+  const logContainerRef = useRef<HTMLPreElement>(null);
+
+  const fetchLogs = useCallback(async (serviceId: string) => {
+    try {
+      setLogLoading(true);
+      const data = await invoke<string>('get_service_logs', { name: serviceId, lines: 100 });
+      setLogs(data);
+    } catch (e) {
+      setLogs(`Error fetching logs: ${e}`);
+    } finally {
+      setLogLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let interval: number;
+    if (showLogs && selectedService) {
+      fetchLogs(selectedService.id);
+      interval = setInterval(() => fetchLogs(selectedService.id), 3000) as unknown as number;
+    }
+    return () => clearInterval(interval);
+  }, [showLogs, selectedService, fetchLogs]);
+
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   const checkAllStatus = useCallback(async () => {
     try {
@@ -83,10 +120,21 @@ export default function DashboardView() {
             }
 
             const status = await invoke<string>('get_service_status', { name: id });
+            const activeVersion = await invoke<string>('get_active_version', { runtime: runtimeName });
+            
+            // For PHP cards that have specific version in ID (like php-8.2)
+            // if it's the active version, we show it. Otherwise we show the ID version.
+            let displayVersion = activeVersion || installed[0] || '';
+            if (id.startsWith('php-') && id !== `php-${activeVersion}`) {
+              // If this is a specific PHP card but not the active one, 
+              // show its own version from ID
+              displayVersion = id.replace('php-', '');
+            }
+
             return {
               id,
               ...meta,
-              version: installed[0] || '',
+              version: displayVersion,
               status: status as ServiceStatus,
             };
           } catch {
@@ -174,6 +222,26 @@ export default function DashboardView() {
       toast.error(`Restart failed: ${e}`, { id: tid });
     } finally {
       setIsRestartingAll(false);
+    }
+  };
+
+  const openLogs = (service: Service) => {
+    setSelectedService(service);
+    setShowLogs(true);
+    setLogs('Loading logs...');
+  };
+
+  const openBrowser = async (serviceId: string) => {
+    if (serviceId === 'nginx') {
+      try {
+        const port = await invoke<number>('get_service_port', { name: 'nginx' });
+        // Standard Nginx default in LekStack is 8080 if not specified
+        const url = `http://localhost:${port || 8080}`;
+        await openUrl(url);
+      } catch (e) {
+        console.error('Failed to open browser:', e);
+        await openUrl('http://localhost:8080');
+      }
     }
   };
 
@@ -303,6 +371,8 @@ export default function DashboardView() {
                     : (service.status as 'running' | 'stopped' | 'error' | 'loading')
                 }
                 onToggle={() => toggleService(service.id)}
+                onViewLogs={() => openLogs(service)}
+                onOpen={service.id === 'nginx' ? () => openBrowser(service.id) : undefined}
                 icon={
                   service.id === 'nginx' ? (
                     <Globe size={24} />
@@ -317,6 +387,68 @@ export default function DashboardView() {
           ))}
         </motion.div>
       </motion.section>
+
+      {/* Log Viewer Modal */}
+      <AnimatePresence>
+        {showLogs && selectedService && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-12 lg:p-24 bg-black/60 backdrop-blur-sm overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-[#1a1a1a] w-full max-w-4xl max-h-full rounded-3xl border border-gray-100 dark:border-gray-800 shadow-2xl flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 rounded-xl">
+                    <Terminal size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {selectedService.name} Logs
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Viewing last 100 lines • Updates every 3s
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowLogs(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
+
+              {/* Log Content */}
+              <div className="flex-1 bg-gray-950 p-4 font-mono text-sm overflow-hidden flex flex-col group">
+                <pre
+                  ref={logContainerRef}
+                  className="flex-1 overflow-auto text-gray-300 custom-scrollbar whitespace-pre-wrap break-all"
+                >
+                  {logs || 'Waiting for logs...'}
+                  {logLoading && <span className="inline-block ml-2 animate-pulse text-indigo-400">_</span>}
+                </pre>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a1a]/50 flex justify-between items-center">
+                <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  Live Feed Active
+                </div>
+                <button
+                  onClick={() => fetchLogs(selectedService.id)}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors shadow-lg shadow-indigo-600/20"
+                >
+                  Refresh Now
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

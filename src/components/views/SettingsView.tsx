@@ -1,17 +1,35 @@
 import { useState, useEffect } from 'react';
-import { Folder, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Folder, Save, CheckCircle, AlertCircle, Server } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 
 export default function SettingsView() {
   const [installPath, setInstallPath] = useState('~/.lekstack');
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [nginxPort, setNginxPort] = useState(8080);
+  const [mariadbPort, setMariadbPort] = useState(3306);
+  const [postgresqlPort, setPostgresqlPort] = useState(5432);
+  const [redisPort, setRedisPort] = useState(6379);
 
   useEffect(() => {
     // Fetch current path from backend
     invoke<string>('get_install_path')
       .then((path) => setInstallPath(path))
       .catch((err) => console.error('Failed to get path:', err));
+    
+    // Fetch current ports
+    Promise.all([
+      invoke<number>('get_service_port', { name: 'nginx' }),
+      invoke<number>('get_service_port', { name: 'mariadb' }),
+      invoke<number>('get_service_port', { name: 'postgresql' }),
+      invoke<number>('get_service_port', { name: 'redis' }),
+    ]).then(([nginx, mariadb, postgresql, redis]) => {
+      setNginxPort(nginx);
+      setMariadbPort(mariadb);
+      setPostgresqlPort(postgresql);
+      setRedisPort(redis);
+    }).catch((err) => console.error('Failed to get ports:', err));
   }, []);
 
   const handleSave = async () => {
@@ -28,6 +46,15 @@ export default function SettingsView() {
       console.error('Failed to save settings:', error);
       setStatus('error');
       setMessage(String(error));
+    }
+  };
+
+  const updatePort = async (serviceName: string, port: number) => {
+    try {
+      await invoke('update_service_port', { name: serviceName, port });
+      toast.success(`${serviceName.toUpperCase()} port updated to ${port}`);
+    } catch (error) {
+      toast.error(`Failed to update ${serviceName} port: ${error}`);
     }
   };
 
@@ -107,6 +134,109 @@ export default function SettingsView() {
 
           <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-lg border border-amber-100 dark:border-amber-900/30">
             <span>⚠️ Changing this path will require re-installing runtimes.</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Port Configuration Card */}
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Server className="text-emerald-500" size={20} />
+            Service Ports
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Configure default ports for each service (requires service restart)
+          </p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Nginx Port */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">Nginx</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">HTTP server port</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={nginxPort}
+                onChange={(e) => setNginxPort(Number(e.target.value))}
+                className="w-24 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#202020] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm text-center"
+              />
+              <button
+                onClick={() => updatePort('nginx', nginxPort)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          {/* MariaDB Port */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">MariaDB</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">MySQL-compatible database port</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={mariadbPort}
+                onChange={(e) => setMariadbPort(Number(e.target.value))}
+                className="w-24 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#202020] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm text-center"
+              />
+              <button
+                onClick={() => updatePort('mariadb', mariadbPort)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          {/* PostgreSQL Port */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">PostgreSQL</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Advanced relational database port</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={postgresqlPort}
+                onChange={(e) => setPostgresqlPort(Number(e.target.value))}
+                className="w-24 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#202020] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm text-center"
+              />
+              <button
+                onClick={() => updatePort('postgresql', postgresqlPort)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          {/* Redis Port */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-gray-900 dark:text-white">Redis</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400">In-memory data store port</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={redisPort}
+                onChange={(e) => setRedisPort(Number(e.target.value))}
+                className="w-24 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#202020] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm text-center"
+              />
+              <button
+                onClick={() => updatePort('redis', redisPort)}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       </div>

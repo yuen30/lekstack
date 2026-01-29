@@ -92,7 +92,7 @@ pub async fn install_runtime(
             (format!("https://github.com/taweechai/lekstack-binaries/releases/download/v1.0.0/bun-v1.0.0-linux-x64.zip"), "archive.zip")
         ],
         "php" => {
-            // Temporary workaround: Use static-php.dev while GitHub release download issues are resolved
+            // Use GitHub Releases - now that repo is public, direct download should work
             // Build these using: .github/workflows/build-php.yml
             // Updated: January 2026 - Latest patch versions
             let (download_version, short_ver) = match version.as_str() {
@@ -103,10 +103,10 @@ pub async fn install_runtime(
                 _ => ("8.3.30", "8.3"),      // Default to 8.3 (most stable)
             };
             
-            // Use static-php.dev as fallback (works reliably)
+            // Use direct download URLs now that repo is public
             vec![
-                (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-cli-linux-x86_64.tar.gz", download_version), "php-cli.tar.gz"),
-                (format!("https://github.com/crazywhalecc/static-php-cli/releases/download/2.7.8/php-{}-micro-linux-x86_64.tar.gz", download_version), "php-micro.tar.gz")
+                (format!("https://github.com/yuen30/lekstack/releases/download/php-{}/php-{}-cli-linux-x86_64.tar.gz", download_version, download_version), "php-cli.tar.gz"),
+                (format!("https://github.com/yuen30/lekstack/releases/download/php-{}/php-{}-fpm-linux-x86_64.tar.gz", download_version, download_version), "php-fpm.tar.gz")
             ]
         },
         "nginx" => {

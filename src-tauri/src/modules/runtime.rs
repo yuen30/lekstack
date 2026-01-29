@@ -1,4 +1,5 @@
 use super::common::get_default_path;
+use super::site::add_parked_path_logic;
 use futures_util::StreamExt;
 use std::fs;
 use std::io::Write;
@@ -24,6 +25,21 @@ pub fn init_environment() -> Result<String, String> {
             fs::create_dir_all(&p).map_err(|e| e.to_string())?;
         }
     }
+
+    // Create user-friendly projects directory in Home
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let projects_dir = PathBuf::from(home).join("LekStack/Web");
+    if !projects_dir.exists() {
+        fs::create_dir_all(&projects_dir).map_err(|e| e.to_string())?;
+        let _ = fs::write(
+            projects_dir.join("index.php"),
+            "<?php echo '<h1>Welcome to LekStack</h1><p>This file is located at ~/LekStack/Web/index.php</p>'; phpinfo(); ?>",
+        );
+    }
+
+    // Auto-park the new projects directory if not already parked
+    add_parked_path_logic(projects_dir.to_string_lossy().to_string());
+
     Ok(base_path.to_string_lossy().to_string())
 }
 

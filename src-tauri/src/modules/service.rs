@@ -14,12 +14,17 @@ pub fn generate_nginx_config(base_path: &PathBuf) -> PathBuf {
 
     let logs_dir = base_path.join("logs");
     let pids_dir = base_path.join("pids");
-    let html_dir = base_path.join("html");
+    
+    // Use ~/LekStack/Web as the default root instead of ~/.lekstack/html
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let html_dir = PathBuf::from(home).join("LekStack/Web");
+    
+    // Create the directory if it doesn't exist
     if !html_dir.exists() {
         let _ = fs::create_dir_all(&html_dir);
         let _ = fs::write(
             html_dir.join("index.html"),
-            "<h1>Welcome to LekStack Nginx!</h1>",
+            "<h1>Welcome to LekStack Nginx!</h1><p>Edit this file at ~/LekStack/Web/index.html</p>",
         );
     }
 
